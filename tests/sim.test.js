@@ -29,7 +29,8 @@ test('determinism and catalog shape', () => {
   assert.equal(S.serialize(S.createGame(7)), S.serialize(S.createGame(7)));
   assert.notEqual(S.serialize(S.createGame(7)), S.serialize(S.createGame(8)));
   const g = S.createGame(3);
-  assert.equal(g.stars.length, 12);
+  assert.equal(g.stars.length, 60);                       // 12 catalog stars + 48 expansion stars
+  assert.equal(g.stars.filter((s) => !s.id.startsWith('g-')).length, 12);
   assert.equal(g.ship.starId, 'tauceti');
   assert.equal('eridian' in g, false);              // the comms system is gone
   assert.ok(g.rocky && g.rocky.docked && g.rocky.starId === g.ship.starId && g.rocky.mission === null);
@@ -169,7 +170,9 @@ test('scripted winning run', () => {
   assert.equal(g.status, 'playing', g.statusText);
   orbit(g, 'sol-3');
   assert.ok(S.deliver(g).ok);
-  assert.equal(g.status, 'won');
+  // Act I completion now opens act II instead of ending the game.
+  assert.equal(g.status, 'playing');
+  assert.equal(g.campaign.act, 2);
   assert.ok(g.time.worldYears < 40);
   assert.ok(g.log.length > 3);
 });
@@ -624,5 +627,5 @@ test('harvest keeps the tuned win path winnable', () => {
   assert.ok(S.travel(g, 'eri40').ok);
   orbit(g, 'eri40-2'); assert.ok(S.deliver(g).ok);
   assert.ok(S.travel(g, 'sol').ok); orbit(g, 'sol-3'); assert.ok(S.deliver(g).ok);
-  assert.equal(g.status, 'won');
+  assert.equal(g.status, 'playing'); assert.equal(g.campaign.act, 2);
 });

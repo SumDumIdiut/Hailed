@@ -1,6 +1,7 @@
 import { stateRng } from './rng.js';
 import { starDistance, findStar } from './stars.js';
 import { addLog } from './util.js';
+import { advanceAct } from './campaign.js';
 
 export const DIM_K = 0.5;          // lum = lum0 * (1 - DIM_K * infection)
 export const EXTINCT_FRAC = 0.85;  // world dies when lum < 0.85 * lum0  (infection > 0.3)
@@ -29,9 +30,11 @@ export function updateLum(star) { star.lum = star.lum0 * (1 - DIM_K * star.infec
 
 function step(state, h) {
   const rng = stateRng(state);
-  const stars = state.stars;
+  // Act I keeps the exact old spread stream: procedural stars only draw RNG once act II opens.
+  const stars = state.campaign?.act === 1 ? state.stars.filter((s) => !s.procedural) : state.stars;
   for (const s of stars) {
-    const { r, a } = dynamics(state, s);
+    const { r, a: net } = dynamics(state, s);
+    const a = state.campaign?.mode === 'endless' ? net * (state.campaign.difficulty ?? 1) : net;
     s.infection = advance(s.infection, a, r, h);
   }
   // Petrova-line spread: infected stars seed others, probability falls off with distance.
@@ -64,9 +67,16 @@ const WORLDS = { earth: 'sol', erid: 'eri40' };
 const WORLD_NAME = { sol: 'Earth', eri40: 'Erid' };
 export function checkEnd(state) {
   if (state.status !== 'playing') return;
+  if (state.campaign?.mode === 'endless') return;  // endless win/lose is handled by campaignTick
   for (const id of ['sol', 'eri40']) {
     const s = findStar(state, id);
     if (s.lum < EXTINCT_FRAC * s.lum0) {
+      if (state.campaign && !s.dark) {
+        s.dark = true;
+        if (!Array.isArray(state.campaign.dark)) state.campaign.dark = [];
+        state.campaign.dark.push(s.id);
+        addLog(state, `${s.name} has gone dark. The Astrophage has taken another world.`);
+      }
       state.status = 'lost';
       state.statusText = `${s.name} has dimmed past the point of no return. ${WORLD_NAME[id]} will not survive. The Taumoeba arrived too late.`;
       addLog(state, state.statusText);
@@ -74,6 +84,8 @@ export function checkEnd(state) {
     }
   }
   if (state.delivered.sol && state.delivered.eri40) {
+    // Saves without the campaign still win here; a campaign moves on to act II.
+    if (state.campaign) { advanceAct(state); return; }
     state.status = 'won';
     state.statusText = 'Taumoeba are hunting Astrophage at both Sol and 40 Eridani. Earth and Erid are saved.';
     addLog(state, state.statusText);

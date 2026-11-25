@@ -3,6 +3,7 @@ import { findPlanet, findStar } from './stars.js';
 import { tick, checkEnd } from './astrophage.js';
 import { addLog, spend } from './util.js';
 import { COSTS, orbitDistanceAu } from './ship.js';
+import { drawEvent } from './events.js';
 
 export const TOLERANT = 0.9;
 export const STEP_YEARS = COSTS.breed.years;
@@ -52,6 +53,8 @@ export function scanPlanet(state, planetId) {
   }
   p.scanned = true;
   const cost = spend(state, close ? COSTS.scan : COSTS.scanRemote, tick);
+  state.research = (state.research ?? 0) + 2;
+  drawEvent(state, 'survey', { chance: 0.25, planetId });
   return { ok: true, text: `${close ? 'Scan' : 'Remote scan'} of ${p.name}: ${fi.join('; ')}.`, findings: fi, level: p.scanLevel, cost };
 }
 
@@ -78,6 +81,7 @@ export function collectSample(state, planetId, how = 'instant') {
     l.strains.push({ id: `s${l.nextId++}`, nTolerance: +(0.05 + rng.next() * 0.03).toFixed(4), population: 200, generation: 0 });
   }
   refresh(state);
+  state.research = (state.research ?? 0) + 3;
   const cost = spend(state, COSTS.sample, tick);
   addLog(state, `Collected a Taumoeba sample from ${p.name}${how === 'tether' ? ' with the tether probe' : ''}.`);
   return { ok: true, text: `Taumoeba sample collected from ${p.name}. Samples aboard: ${state.ship.samples}.`, cost };

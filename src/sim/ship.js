@@ -1,6 +1,8 @@
 import { starDistance, findStar, findPlanet } from './stars.js';
 import { tick } from './astrophage.js';
 import { addLog } from './util.js';
+import { drawEvent } from './events.js';
+import { revealAround } from './galaxy.js';
 
 const G_LY_YR2 = 1.0323;            // 1 g in ly/yr^2 (c = 1)
 export const ACCEL = 1.5 * G_LY_YR2; // 1.5 g spin drive
@@ -51,6 +53,22 @@ export function travel(state, starId) {
   state.time.shipYears += plan.shipYears;
   addLog(state, `Left ${from.name} for ${to.name}: ${plan.distanceLy.toFixed(1)} ly, ${plan.shipYears.toFixed(1)} years aboard, ${plan.worldYears.toFixed(1)} years at home.`);
   tick(state, plan.worldYears);
+  if (state.status === 'playing') {
+    // First visit: chart the system and open the map around it.
+    if (state.galaxy && !state.galaxy.surveyed[starId]) {
+      state.galaxy.surveyed[starId] = true;
+      state.research = (state.research ?? 0) + 5;
+    }
+    revealAround(state, starId, 5);
+    for (const poi of state.pois || []) {
+      if (!poi.pos) continue;
+      const d = Math.hypot(to.pos[0] - poi.pos[0], to.pos[1] - poi.pos[1], to.pos[2] - poi.pos[2]);
+      if (d <= 2) poi.visited = true;
+    }
+    // Flight cards first; an arrival card is only drawn when nothing is already pending.
+    drawEvent(state, 'flight', { chance: 0.35, from: from.id, to: starId });
+    if (!state.events?.pending) drawEvent(state, 'arrive', { chance: 0.3, starId });
+  }
   return { ...plan, status: state.status };
 }
 
