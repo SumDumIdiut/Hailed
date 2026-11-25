@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAILED</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="map"></canvas>
+
+<div id="ui">
+  <!-- ship frame: edge vignette + window struts, purely decorative -->
+  <div id="cockpit" aria-hidden="true"></div>
+  <div id="labels"></div>
+
+  <!-- dashboard strip: instrument cluster, then station keys + mission directive -->
+  <div id="deck">
+    <header id="hud" class="hidden">
+      <div class="hud-block loc" id="h-loc-b">
+        <svg class="orbicon" viewBox="0 0 36 36" aria-hidden="true">
+          <ellipse class="o-ring" cx="18" cy="18" rx="14" ry="8" transform="rotate(-20 18 18)"/>
+          <circle class="o-star" cx="18" cy="18" r="3"/>
+          <circle class="o-ship o-park" cx="9.7" cy="26.5" r="1.9"/>
+          <g class="o-planet"><circle class="o-pl" cx="31.2" cy="13.2" r="3"/><circle class="o-pr" cx="31.2" cy="13.2" r="6.2"/><circle class="o-ship" cx="31.2" cy="7" r="1.7"/></g>
+        </svg>
+        <div class="stack"><span class="k">Position</span><span class="v txt" id="h-loc">--</span><span class="s" id="h-orbit">--</span></div>
+      </div>
+      <div class="hud-block"><span class="k">World clock</span><div class="val"><span class="v flap" id="h-world">0.00</span><small class="u">YR</small></div></div>
+      <div class="hud-block"><span class="k">Ship clock</span><div class="val"><span class="v flap" id="h-ship">0.00</span><small class="u">YR</small></div></div>
+      <div class="hud-block gauge"><span class="k">Fuel</span><div class="g-body"><div class="arc" id="h-fuel"></div><div class="g-read"><span class="v" id="h-fuel-t"></span><small class="u">KG</small></div></div></div>
+      <div class="hud-block gauge"><span class="k">Hull</span><div class="g-body"><div class="arc hull" id="h-hull"></div><div class="g-read"><span class="v" id="h-hull-t"></span><small class="u">INTEGRITY</small></div></div></div>
+      <div class="hud-block"><span class="k">Samples</span><div class="val"><span class="v flap" id="h-samples">0</span></div></div>
+      <div class="hud-block count" id="h-earth-b"><span class="k">Earth <em>starlight</em></span><div class="val"><span class="v big" id="h-earth">--</span><small class="u">YR</small></div><div class="decay" id="h-earth-d"><i></i></div></div>
+      <div class="hud-block count" id="h-erid-b"><span class="k">Erid <em>starlight</em></span><div class="val"><span class="v big" id="h-erid">--</span><small class="u">YR</small></div><div class="decay" id="h-erid-d"><i></i></div></div>
+    </header>
+
+    <div id="deck-row">
+      <nav id="tabs" class="hidden">
+        <button data-scene="map" title="Navigation chart (1)"><i class="lamp"></i><span>Nav</span><b>1</b></button>
+        <button data-scene="system" title="System helm (2)"><i class="lamp"></i><span>System</span><b>2</b></button>
+        <button data-scene="lab" title="Xenonite lab (3)"><i class="lamp"></i><span>Lab</span><b>3</b></button>
+        <button data-scene="blip" title="Blip-A (4)"><i class="lamp"></i><span>Blip-A</span><b>4</b></button>
+        <button id="btn-save" class="ghost" title="Save now"><span>Save</span></button>
+      </nav>
+      <div id="objective" class="hidden"><span class="k">Directive <b id="obj-stage"></b></span><span class="goal" id="obj-goal"></span><span class="act" id="obj-act"></span></div>
+    </div>
+  </div>
+
+  <aside id="panel-map" class="panel side hidden"></aside>
+  <aside id="panel-system" class="panel side hidden"></aside>
+  <aside id="panel-planet" class="panel side hidden"></aside>
+  <aside id="panel-ops" class="panel side hidden"></aside>
+  <div id="runbar" class="hidden"><i></i><span>SKIMMING THE PETROVA LINE</span></div>
+  <section id="panel-lab" class="panel center hidden"></section>
+  <section id="panel-blip" class="panel center hidden"></section>
+
+  <div id="tooltip" class="hidden"></div>
+  <div id="toast" class="hidden"></div>
+  <div id="log"></div>
+  <div id="hint" class="hidden"></div>
+
+  <div id="jump" class="hidden">
+    <div class="jump-dim"></div>
+    <section id="jump-confirm" class="jbox hidden"></section>
+    <section id="jump-flight" class="jbox hidden"></section>
+  </div>
+
+  <div id="title" class="screen">
+    <div class="stardrift" aria-hidden="true"></div>
+    <div class="title-inner">
+      <div class="tbar"><span>HAIL MARY &middot; MISSION CONTROL LINK</span><span>CARRIER LOCKED &middot; 40 ERIDANI RELAY</span></div>
+      <div class="tbody">
+        <svg class="patch" viewBox="0 0 120 120" aria-hidden="true">
+          <defs>
+            <path id="pt-top" d="M 15,60 A 45,45 0 0 1 105,60"/>
+            <path id="pt-bot" d="M 11,60 A 49,49 0 0 0 109,60"/>
+          </defs>
+          <circle cx="60" cy="60" r="58" class="p-rim"/>
+          <circle cx="60" cy="60" r="56" class="p-out"/>
+          <circle cx="60" cy="60" r="36" class="p-in"/>
+          <circle cx="60" cy="60" r="34" class="p-disc"/>
+          <text class="p-txt"><textPath href="#pt-top" startOffset="50%" text-anchor="middle">HAIL MARY</textPath></text>
+          <text class="p-txt s"><textPath href="#pt-bot" startOffset="50%" text-anchor="middle">TWO WORLDS &middot; ONE SHIP</textPath></text>
+          <ellipse cx="60" cy="60" rx="27" ry="12" transform="rotate(-24 60 60)" class="p-orb"/>
+          <ellipse cx="60" cy="60" rx="18" ry="7.5" transform="rotate(-24 60 60)" class="p-orb d"/>
+          <circle cx="60" cy="60" r="5" class="p-star"/>
+          <g class="p-rays"><path d="M60 49v-3M60 71v3M49 60h-3M71 60h3"/></g>
+          <circle cx="82.7" cy="48.9" r="3.2" class="p-pl"/>
+          <circle cx="43.3" cy="68.5" r="2.4" class="p-pl c"/>
+          <path d="M71 65.5l7 -2.6l-2.2 6.5z" class="p-ship" transform="rotate(-32 74 65)"/>
+          <path d="M60 26 L62 31 L60 29.5 L58 31z" class="p-ship"/>
+        </svg>
+        <div class="eyebrow">ASTROPHAGE CONTAINMENT FAILURE</div>
+        <h1>HAILED</h1>
+        <p class="sub">The stars are dimming. You are the last ship. Breed the microbe, befriend the stranger, save two worlds.</p>
+        <div class="title-btns">
+          <button id="btn-new" class="primary">New game</button>
+          <button id="btn-continue">Continue</button>
+          <button id="btn-tut" class="ghost">Replay tutorial</button>
+          <button id="btn-quit" class="ghost">Quit</button>
+        </div>
+      </div>
+      <div class="foot">Drag: rotate &middot; Wheel: zoom &middot; 1-4: switch station &middot; Esc / Space: skip burn &middot; F11: fullscreen</div>
+    </div>
+  </div>
+
+  <div id="modal" class="screen hidden"><div class="modal-inner"><h2 id="m-title"></h2><p id="m-text"></p><button id="m-btn" class="primary">New game</button></div></div>
+  <div id="nogl" class="hidden">WebGL2 is unavailable. System and planet views are disabled; map, lab and Blip-A still work.</div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

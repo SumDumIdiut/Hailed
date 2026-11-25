@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Hailed
+Comment=Save two worlds from Astrophage
+Exec=/run/media/oliver/Drive/Scripts/Hailed/hailed
+Path=/run/media/oliver/Drive/Scripts/Hailed
+Terminal=false
+Categories=Game;
+Icon=/run/media/oliver/Drive/Scripts/Hailed/assets/icon.png

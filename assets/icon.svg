@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Hailed app icon: a mission patch. A dimming, Astrophage-mottled star, the Petrova line arcing to a planet,
+       and the Hail Mary on its approach, inside an amber patch ring. -->
+  <defs>
+    <radialGradient id="space" cx="50%" cy="45%" r="60%">
+      <stop offset="0" stop-color="#1a2338"/>
+      <stop offset="1" stop-color="#05070d"/>
+    </radialGradient>
+    <radialGradient id="star" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff6d8"/>
+      <stop offset="0.45" stop-color="#ffc45a"/>
+      <stop offset="0.85" stop-color="#e2741e"/>
+      <stop offset="1" stop-color="#9c3a10"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffb347" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#ff7a2a" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#ff5a1a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="planet" cx="35%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#9fd3c7"/>
+      <stop offset="0.55" stop-color="#3f7f8c"/>
+      <stop offset="1" stop-color="#0d2230"/>
+    </radialGradient>
+    <linearGradient id="petrova" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff4b2b" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#ff4b2b" stop-opacity="0.05"/>
+    </linearGradient>
+    <clipPath id="inner"><circle cx="256" cy="256" r="214"/></clipPath>
+  </defs>
+
+  <!-- patch body -->
+  <circle cx="256" cy="256" r="248" fill="#0b0f18"/>
+  <circle cx="256" cy="256" r="240" fill="none" stroke="#e8a33a" stroke-width="12"/>
+  <circle cx="256" cy="256" r="222" fill="none" stroke="#e8a33a" stroke-width="2" stroke-opacity="0.6"/>
+
+  <g clip-path="url(#inner)">
+    <rect width="512" height="512" fill="url(#space)"/>
+    <!-- stars -->
+    <g fill="#cfe3ff">
+      <circle cx="120" cy="140" r="2.2"/><circle cx="380" cy="110" r="1.6"/><circle cx="420" cy="230" r="2"/>
+      <circle cx="96" cy="300" r="1.4"/><circle cx="170" cy="400" r="1.8"/><circle cx="350" cy="420" r="1.4"/>
+      <circle cx="300" cy="90" r="1.2"/><circle cx="440" cy="330" r="1.5"/><circle cx="80" cy="220" r="1.2"/>
+    </g>
+    <!-- star glow + Petrova line to the planet -->
+    <circle cx="210" cy="250" r="150" fill="url(#glow)"/>
+    <path d="M 262 238 Q 330 200 392 318" fill="none" stroke="url(#petrova)" stroke-width="7" stroke-linecap="round"/>
+    <!-- the star, with Astrophage mottling -->
+    <circle cx="210" cy="250" r="78" fill="url(#star)"/>
+    <g fill="#3a1408" fill-opacity="0.55">
+      <ellipse cx="180" cy="228" rx="16" ry="11"/>
+      <ellipse cx="236" cy="282" rx="22" ry="13" transform="rotate(-20 236 282)"/>
+      <ellipse cx="205" cy="300" rx="10" ry="7"/>
+      <ellipse cx="250" cy="215" rx="9" ry="6"/>
+      <ellipse cx="168" cy="272" rx="8" ry="12"/>
+    </g>
+    <!-- planet (Adrian) -->
+    <circle cx="392" cy="330" r="40" fill="url(#planet)"/>
+    <path d="M 356 340 A 40 40 0 0 0 428 344" fill="none" stroke="#bff0e2" stroke-opacity="0.5" stroke-width="3"/>
+    <!-- the Hail Mary: spine, centrifuge ring, drive plume -->
+    <g transform="translate(318 148) rotate(32)">
+      <path d="M -70 0 L -96 -7 L -96 7 Z" fill="#7fd8ff" fill-opacity="0.7"/>
+      <rect x="-70" y="-5" width="96" height="10" rx="3" fill="#d9dde4"/>
+      <rect x="-62" y="-11" width="18" height="22" rx="3" fill="#b8bec8"/>
+      <ellipse cx="-6" cy="0" rx="7" ry="26" fill="none" stroke="#d9dde4" stroke-width="4"/>
+      <path d="M 26 -6 L 42 0 L 26 6 Z" fill="#eef1f5"/>
+    </g>
+  </g>
+
+</svg>
