@@ -13,6 +13,7 @@ import { createJump } from './ui/jump.js';
 import { createObjective } from './ui/objective.js';
 import { createOps } from './ui/ops.js';
 import { sfx, music, bus as audioBus } from './audio/index.js';
+import { actCard, fadeTo } from './ui/cinematics.js';
 
 const SAVE_KEY = 'hailed-save';
 const IDLE_DRIFT = 0.02;          // world years per real second in the system scene; 0 disables
@@ -26,7 +27,7 @@ const SYSTEM_LIMITS = { min: 3, max: 600 }, PLANET_LIMITS = { min: 2.2, max: 30 
 let camStar = null;
 
 const params = new URLSearchParams(location.search);
-let state = null, scene = 'title', selectedPlanet = null, ended = false;
+let state = null, scene = 'title', prevScene = 'title', selectedPlanet = null, ended = false;
 let renderer = null, glOk = false;
 const camSys = { ...SYSTEM_CAM }, camPlanet = { ...PLANET_CAM };
 const hud = createHud(sim);
@@ -186,7 +187,17 @@ function seedSystemCam() {
 }
 function setScene(name) {
   if (!state) return;
+  // Crossfade only when switching between different scenes
+  if (name !== prevScene) {
+    const fader = document.getElementById('fader');
+    if (fader) { fader.style.opacity = '1'; }
+    setTimeout(() => {
+      const f = document.getElementById('fader');
+      if (f) { f.style.opacity = '0'; }
+    }, 180);
+  }
   if (name === 'planet' && !selectedPlanet) name = 'system';
+  prevScene = name;
   scene = name;
   music.setScene(name); if (name === 'system' || name === 'planet') music.setStar(currentStar());
   for (const id of PANELS) $(id).classList.add('hidden');
@@ -230,7 +241,10 @@ function startGame(s, sceneName) {
   hud.show(true); hud.update(state); hud.renderLog(state);
   setScene(sceneName || 'map');
 }
-function newGame(sceneName) { tutorial.replay(); const s = sim.createGame(1); startGame(s, sceneName); save(); } // a new game always replays the tutorial
+function newGame(sceneName) {
+  tutorial.replay(); const s = sim.createGame(1); startGame(s, sceneName); save();
+  actCard({ kicker: 'ACT I', title: 'HAIL MARY', subtitle: 'The stars are dimming. You are the last ship.' });   // not awaited: the tutorial starts underneath
+} // a new game always replays the tutorial
 function continueGame() {
   try { startGame(sim.deserialize(localStorage.getItem(SAVE_KEY)), 'map'); }
   catch (e) { console.error(e); toast('Save is unreadable.', true); }

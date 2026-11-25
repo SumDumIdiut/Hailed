@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <canvas id="gl"></canvas>
 <canvas id="map"></canvas>
 
@@ -67,7 +68,7 @@
     <section id="jump-flight" class="jbox hidden"></section>
   </div>
 
-  <div id="title" class="screen">
+  <div id="title" class="screen title-anim">
     <div class="stardrift" aria-hidden="true"></div>
     <div class="title-inner">
       <div class="tbar"><span>HAIL MARY &middot; MISSION CONTROL LINK</span><span>CARRIER LOCKED &middot; 40 ERIDANI RELAY</span></div>
@@ -102,13 +103,22 @@
           <button id="btn-quit" class="ghost">Quit</button>
         </div>
       </div>
-      <div class="foot">Drag: rotate &middot; Wheel: zoom &middot; 1-4: switch station &middot; Esc / Space: skip burn &middot; F11: fullscreen</div>
     </div>
+    <div class="foot">Drag: rotate &middot; Wheel: zoom &middot; 1-4: switch station &middot; Esc / Space: skip burn &middot; F11: fullscreen</div>
+    <div class="v02-dev">v0.2-dev</div>
   </div>
 
-  <div id="modal" class="screen hidden"><div class="modal-inner"><h2 id="m-title"></h2><p id="m-text"></p><button id="m-btn" class="primary">New game</button></div></div>
-  <div id="nogl" class="hidden">WebGL2 is unavailable. System and planet views are disabled; map, lab and Blip-A still work.</div>
+  <div class="title-cinema">
+    <div class="signal-line"></div>
+    <div class="light-sweep"></div>
+  </div>
 </div>
+
+<div id="modal" class="screen hidden"><div class="modal-inner"><h2 id="m-title"></h2><p id="m-text"></p><button id="m-btn" class="primary">New game</button></div></div>
+<div id="nogl" class="hidden">WebGL2 is unavailable. System and planet views are disabled; map, lab and Blip-A still work.</div>
+
+<script type="module" src="src/ui/cinematics.js"></script>
 <script type="module" src="src/main.js"></script>
+
 </body>
 </html>

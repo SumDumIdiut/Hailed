@@ -3,6 +3,7 @@
 import { QUAD_VS, BG_VS, BG_FS, ORBIT_VS, ORBIT_FS, BODY_FS, RIB_VS, RIB_FS, PART_VS, PART_FS, PART_PER, TRI_VS, TRI_FS } from './shaders.js';
 import { SHIP_TRIS, SHIP_TRIS_LO, PIVOT_Z, STERN_Z, SHIP_LEN, NAV, NOZZLES, INTAKE,
   BLIP_TRIS, BLIP_TRIS_LO, TUNNEL_TRIS, TUNNEL_TRIS_LO, BLIP_LEN, BLIP_DOCK } from './ship.js';
+import { createPostFx } from './postfx.js';
 
 const FOV = 45 * Math.PI / 180;
 const TAN_H = Math.tan(FOV / 2);
@@ -239,7 +240,9 @@ export function createRenderer(canvas) {
   const rib = program(gl, RIB_VS, RIB_FS, 'ribbon');
   const part = program(gl, PART_VS, PART_FS, 'part');
   const tri = program(gl, TRI_VS, TRI_FS, 'tri');
-  const progs = [bg, body, orbit, rib, part, tri];
+  const postfx = createPostFx(gl, program);
+  const progs = [bg, body, orbit, rib, part, tri, ...postfx.progs];
+  const fx = { bloom: 0.8, vignette: 0.35, grain: 0.04, aberration: 0.0015, exposure: 1, fade: 0 };
   const psc = gl.getExtension('KHR_parallel_shader_compile');
   // Without the extension the first status read blocks; hold it back so the menu paints and takes input first.
   const statusAt = performance.now() + (psc ? 0 : 400);
@@ -835,6 +838,8 @@ export function createRenderer(canvas) {
     const cam = setupFrame(camera, fitDist(star), 3, 600);
     const { Rv, eye } = cam;
     VW = { Rv, eye };
+    postfx.resize(W, H);
+    postfx.begin();
     drawBackground(Rv, timeSec, star.id || star.name);
     const showOrbits = opts.showOrbits !== false;
 
@@ -1006,6 +1011,7 @@ export function createRenderer(canvas) {
       const s = screen.find(q => q.id === opts.selectedId);
       if (s) drawSelect(s.x * dpr, s.y * dpr, s.r * dpr, timeSec);
     }
+    postfx.end({ time: timeSec, ...fx });
   }
 
   function flareFor(sb, list, star) {
@@ -1077,6 +1083,8 @@ export function createRenderer(canvas) {
       eye = cam.eyeDir.map(v => v * dist);
     }
     VW = { Rv, eye };
+    postfx.resize(W, H);
+    postfx.begin();
     drawBackground(Rv, timeSec, 'p' + planet.seed);
     screen = [];
     const list = [];
@@ -1159,6 +1167,7 @@ export function createRenderer(canvas) {
       if (b.kind === 'star') drawStarBody(b, timeSec); else drawPlanetBody(b, timeSec);
     }
     if (star) { const sb = list.find(b => b.kind === 'star'); if (sb) flareFor(sb, list, star); }
+    postfx.end({ time: timeSec, ...fx });
   }
 
   function pick(clientX, clientY) {
@@ -1178,12 +1187,15 @@ export function createRenderer(canvas) {
     const s = screen.find(q => q.id === id);
     return s ? { x: s.x, y: s.y, r: s.r } : null;
   }
+  function setFx(partial) { if (partial) Object.assign(fx, partial); }
+
   function dispose() {
+    postfx.dispose();
     gl.deleteProgram(bg.p); gl.deleteProgram(body.p); gl.deleteProgram(orbit.p); gl.deleteProgram(rib.p); gl.deleteProgram(part.p); gl.deleteProgram(tri.p); gl.deleteBuffer(triBuf); gl.deleteVertexArray(triVao); gl.deleteVertexArray(emptyVao); gl.deleteBuffer(ribBuf); gl.deleteVertexArray(ribVao);
     gl.deleteBuffer(quadBuf); gl.deleteBuffer(orbBuf);
     gl.deleteVertexArray(quadVao); gl.deleteVertexArray(orbVao);
   }
 
   resize();
-  return { resize: () => { sizeDirty = true; }, setScale, get status() { pollReady(); return failed ? 'failed' : ready ? 'ready' : 'compiling'; }, get error() { return failed; }, get scale() { return scale; }, renderSystem, renderPlanet, pick, planetScreenPos, shipScreenPos, blipScreenPos, dispose, fitDist, shipOrbitRadius };
+  return { resize: () => { sizeDirty = true; }, setScale, setFx, get fx() { return { ...fx }; }, get status() { pollReady(); return failed ? 'failed' : ready ? 'ready' : 'compiling'; }, get error() { return failed; }, get scale() { return scale; }, renderSystem, renderPlanet, pick, planetScreenPos, shipScreenPos, blipScreenPos, dispose, fitDist, shipOrbitRadius };
 }

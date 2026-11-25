@@ -414,4 +414,66 @@ h1::after{content:"";display:block;height:4px;width:calc(100% - .4em);margin:cla
 #rockybar .rk-tag{color:var(--dim);font:700 9px var(--cond);letter-spacing:.2em;text-transform:uppercase;margin-right:4px}
 #rockybar .rk-line{flex:1;color:var(--hi);font:11px var(--mono)}
 
+/* ── title screen cinematics ────────────────────────────────────────────── */
+#title .title-cinema{
+  position:absolute;inset:0;pointer-events:none;z-index:35;
+  overflow:hidden;
+}
+#title .signal-line{
+  position:absolute;top:50%;left:0;width:1px;height:24px;background:var(--acc);
+  margin-top:-12px;opacity:0;transform:scaleY(0);transition:transform .6s cubic-bezier(.22,1,.36,1),opacity .6s cubic-bezier(.22,1,.36,1);
+  @media (prefers-reduced-motion: reduce){transition:none;}
+}
+#title .signal-line.active{opacity:1;transform:scaleY(1);}
+#title .light-sweep{
+  position:absolute;top:0;left:0;right:0;height:40px;background:linear-gradient(90deg,transparent,rgba(94,196,216,.15),transparent);
+  pointer-events:none;opacity:0;transform:translateY(-40px);transition:transform .8s cubic-bezier(.22,1,.36,1),opacity .8s cubic-bezier(.22,1,.36,1);
+  @media (prefers-reduced-motion: reduce){transition:none;}
+}
+#title .light-sweep.sweeping{transform:translateY(0);opacity:1;}
+#title .title-btns button{
+  opacity:0;transform:translateY(20px);transition:opacity .2s,transform .2s;
+  @media (prefers-reduced-motion: reduce){transition:none;}
+}
+#title .title-btns button.primary{transition-delay: .1s;}
+#title .title-btns button.secondary{transition-delay: .2s;}
+#title .title-btns button.ghost{transition-delay: .3s;}
+@keyframes buttonStaggerIn{
+  to{opacity:1;transform:translateY(0);}
+}
+#title.title-anim .title-btns button{animation:buttonStaggerIn .3s forwards;}
+#title.title-anim .title-btns button.primary{animation-delay: .06s;}
+#title.title-anim .title-btns button.secondary{animation-delay: .16s;}
+#title.title-anim .title-btns button.ghost{animation-delay: .24s;}
+#title .light-sweep{
+  animation:lightSweep 8s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce){animation:none;}
+}
+@keyframes lightSweep{
+  0%{background-position:0% 50%;}
+  100%{background-position:100% 50%;}
+}
+@keyframes signalPulse{
+  0%,100%{opacity:0.3;transform:scaleX(1);}
+  50%{opacity:0.8;transform:scaleX(1.05);}
+}
+
+/* ── panel motion ───────────────────────────────────────────────────────── */
+.panel:not(.hidden){
+  animation:panelIn .16s ease-out forwards;
+  @media (prefers-reduced-motion: reduce){animation:none;}
+}
+@keyframes panelIn{
+  from{opacity:0;transform:translateX(8px);}
+  to{opacity:1;transform:translateX(0);}
+}
+
+/* ── button transitions ─────────────────────────────────────────────────── */
+button{
+  transition:background-color .12s ease,color .12s ease,transform .12s ease;
+  @media (prefers-reduced-motion: reduce){transition:none;}
+}
+button:hover:not(:disabled){transition-property:background-color,color,transform;}
+button:active:not(:disabled){transition-property:transform;}
+
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
