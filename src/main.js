@@ -38,12 +38,26 @@ const tutorial = createTutorial({ sim, getState: () => state, getScene: () => sc
 // ---- WebGL2 / renderer -------------------------------------------------
 try {
   const probe = document.createElement('canvas');
-  if (!probe.getContext('webgl2')) throw new Error('no webgl2');
+  const pctx = probe.getContext('webgl2');
+  if (!pctx) throw new Error('no webgl2');
+  pctx.getExtension('WEBGL_lose_context')?.loseContext();   // free the probe context (Windows caps live contexts)
   renderer = createRenderer($('gl'));
   glOk = !!renderer;
 } catch (e) {
   console.error('renderer unavailable', e);
   $('nogl').classList.remove('hidden');
+}
+if (renderer) {
+  // Shaders compile in the background (see render/index.js); fall back to the no-3D mode if they fail.
+  const watchShaders = () => {
+    const s = renderer && renderer.status;
+    if (s === 'compiling') { setTimeout(watchShaders, 250); return; }
+    if (s === 'failed') { console.error('renderer disabled:', renderer.error); renderer = null; glOk = false; $('nogl').classList.remove('hidden'); }
+  };
+  setTimeout(watchShaders, 250);
+  // A GPU reset or driver crash loses the context; reload into a fresh one rather than staying black.
+  $('gl').addEventListener('webglcontextlost', (e) => e.preventDefault());
+  $('gl').addEventListener('webglcontextrestored', () => { if (state) save(); location.reload(); });
 }
 
 // ---- helpers -----------------------------------------------------------

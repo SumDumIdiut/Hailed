@@ -205,22 +205,28 @@ export function fitDist(star) {
   return m * 2.6;
 }
 
-function compile(gl, type, src, label) {
+function compile(gl, type, src) {
   const s = gl.createShader(type);
   gl.shaderSource(s, src); gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
-    throw new Error(`Shader ${label} failed: ${gl.getShaderInfoLog(s)}`);
   return s;
 }
+// Programs are compiled without reading their status here: a status query blocks until the driver finishes, and on Windows
+// (ANGLE -> D3D) the big ray-march shaders can take many seconds, which froze the page (black window, unclickable menu).
+// createRenderer polls readiness each frame instead (KHR_parallel_shader_compile where available).
 function program(gl, vs, fs, label) {
   const p = gl.createProgram();
-  gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vs, label + '.vs'));
-  gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fs, label + '.fs'));
+  const v = compile(gl, gl.VERTEX_SHADER, vs), f = compile(gl, gl.FRAGMENT_SHADER, fs);
+  gl.attachShader(p, v); gl.attachShader(p, f);
   gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(`Link ${label}: ${gl.getProgramInfoLog(p)}`);
   const locs = {};
   const loc = n => (n in locs) ? locs[n] : (locs[n] = gl.getUniformLocation(p, n));
-  return { p, loc };
+  return { p, v, f, label, loc };
+}
+function linkError(gl, q) {
+  if (gl.getProgramParameter(q.p, gl.LINK_STATUS)) return null;
+  for (const [s, k] of [[q.v, 'vs'], [q.f, 'fs']])
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) return `Shader ${q.label}.${k} failed: ${gl.getShaderInfoLog(s)}`;
+  return `Link ${q.label}: ${gl.getProgramInfoLog(q.p)}`;
 }
 
 export function createRenderer(canvas) {
@@ -233,6 +239,20 @@ export function createRenderer(canvas) {
   const rib = program(gl, RIB_VS, RIB_FS, 'ribbon');
   const part = program(gl, PART_VS, PART_FS, 'part');
   const tri = program(gl, TRI_VS, TRI_FS, 'tri');
+  const progs = [bg, body, orbit, rib, part, tri];
+  const psc = gl.getExtension('KHR_parallel_shader_compile');
+  // Without the extension the first status read blocks; hold it back so the menu paints and takes input first.
+  const statusAt = performance.now() + (psc ? 0 : 400);
+  let ready = false, failed = null;
+  function pollReady() {
+    if (ready || failed) return ready;
+    if (gl.isContextLost()) return false;
+    if (psc ? !progs.every(q => gl.getProgramParameter(q.p, psc.COMPLETION_STATUS_KHR)) : performance.now() < statusAt) return false;
+    for (const q of progs) { const e = linkError(gl, q); if (e) { failed = e; console.error(e); return false; } }
+    ready = true;
+    return true;
+  }
+  function idleFrame() { ensureSize(); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); screen = []; }
   const TRI_MAX = 24000, TF = 9;
   const triBuf = gl.createBuffer(), triVao = gl.createVertexArray(), triData = new Float32Array(TRI_MAX * TF);
   let triN = 0;
@@ -810,6 +830,7 @@ export function createRenderer(canvas) {
   }
 
   function renderSystem(star, timeSec = 0, camera = {}, opts = {}) {
+    if (!pollReady()) { idleFrame(); return; }
     const planets = star.planets || [];
     const cam = setupFrame(camera, fitDist(star), 3, 600);
     const { Rv, eye } = cam;
@@ -1010,6 +1031,7 @@ export function createRenderer(canvas) {
    *   follow: { yaw, pitch, dist } }                         // chase camera on the ship (offsets from the default behind/above view)
    */
   function renderPlanet(planet, star, timeSec = 0, camera = {}, opts = {}) {
+    if (!pollReady()) { idleFrame(); return; }
     const ringF = planet.rings ? Math.max(1, planet.rings.outer / 1.5) : 1;
     const ph = planet.phase || 0;
     const Lw = norm([Math.cos(ph + 0.8), 0.22, Math.sin(ph + 0.8)]);
@@ -1163,5 +1185,5 @@ export function createRenderer(canvas) {
   }
 
   resize();
-  return { resize: () => { sizeDirty = true; }, setScale, get scale() { return scale; }, renderSystem, renderPlanet, pick, planetScreenPos, shipScreenPos, blipScreenPos, dispose, fitDist, shipOrbitRadius };
+  return { resize: () => { sizeDirty = true; }, setScale, get status() { pollReady(); return failed ? 'failed' : ready ? 'ready' : 'compiling'; }, get error() { return failed; }, get scale() { return scale; }, renderSystem, renderPlanet, pick, planetScreenPos, shipScreenPos, blipScreenPos, dispose, fitDist, shipOrbitRadius };
 }
