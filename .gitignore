@@ -3,3 +3,6 @@ voice-previews/
 __pycache__/
 *.pyc
 .hidden
+dist/
+windows/**/bin/
+windows/**/obj/

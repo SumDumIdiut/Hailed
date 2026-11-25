@@ -222,7 +222,18 @@ function continueGame() {
   catch (e) { console.error(e); toast('Save is unreadable.', true); }
 }
 function quit() {
-  try { window.webkit.messageHandlers.hailed.postMessage('quit'); } catch (_) { window.close(); }
+  let done = false;
+  try {
+    const h = window.webkit?.messageHandlers?.hailed;
+    if (h && typeof h.postMessage === 'function') { h.postMessage('quit'); done = true; }
+  } catch (_) {}
+  if (done) return;
+  try {
+    const w = window.chrome?.webview;
+    if (w && typeof w.postMessage === 'function') { w.postMessage('quit'); done = true; }
+  } catch (_) {}
+  if (done) return;
+  try { window.close(); } catch (_) {}
 }
 $('btn-new').addEventListener('click', () => newGame('map'));
 $('btn-continue').addEventListener('click', continueGame);
