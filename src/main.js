@@ -12,6 +12,9 @@ import { createTutorial } from './ui/tutorial.js';
 import { createJump } from './ui/jump.js';
 import { createObjective } from './ui/objective.js';
 import { createOps } from './ui/ops.js';
+import { createEventCard } from './ui/eventcard.js';
+import { createTech } from './ui/techui.js';
+import { createBoard } from './ui/board.js';
 import { sfx, music, bus as audioBus } from './audio/index.js';
 import { actCard, fadeTo } from './ui/cinematics.js';
 
@@ -81,7 +84,14 @@ function checkEnd() {
   const won = state.status === 'won';
   music.stinger(won ? 'win' : 'lose'); if (!won) sfx.play('alarm');
   $('m-title').textContent = won ? 'TWO WORLDS SAVED' : 'MISSION FAILED';
-  $('m-text').textContent = state.statusText || '';
+  let text = state.statusText || '';
+  const c = state.campaign;
+  if (c) {
+    text += `${text ? ' ' : ''}Campaign score ${fmt(c.score ?? 0, 1)} star-years · ${(c.saved || []).length} worlds saved · ${(c.dark || []).length} worlds dark`;
+    if (c.mode === 'endless') text += ` · cycle ${c.cycle || 0}`;
+    text += '.';
+  }
+  $('m-text').textContent = text;
   document.querySelector('.modal-inner').classList.toggle('lost', !won);
   $('modal').classList.remove('hidden');
 }
@@ -108,6 +118,9 @@ window.__hailed = { get state() { return state; }, sim, ops, blip, setScene: (n)
 
 // ---- map ---------------------------------------------------------------
 const mapView = createMap($('map'), $('tooltip'), { onSelect: renderMapPanel });
+const eventCard = createEventCard({ sim, state: () => state, afterAction });
+const tech = createTech({ sim, state: () => state, afterAction, event: (n) => tutorial.on(n) });
+const board = createBoard({ sim, onSelect: (id) => { mapView.select(id); setScene('map'); } });
 function renderMapPanel(star) {
   const p = $('panel-map');
   if (!star || scene !== 'map') { p.classList.add('hidden'); return; }
@@ -171,12 +184,12 @@ gl.addEventListener('click', (e) => {
 });
 
 // ---- scenes ------------------------------------------------------------
-const PANELS = ['panel-map', 'panel-system', 'panel-planet', 'panel-ops', 'panel-lab', 'panel-blip'];
+const PANELS = ['panel-map', 'panel-system', 'panel-planet', 'panel-ops', 'panel-lab', 'panel-blip', 'panel-tech'];
 const hints = {
-  map: 'Drag: rotate | Wheel: zoom | Click: select star | 1-4: stations',
+  map: 'Drag: rotate | Wheel: zoom | Click: select star | 1-5: stations',
   system: 'Drag: orbit | Wheel: zoom | Click planet to select',
   planet: 'Drag: look around | Wheel: distance | F: follow ship / free camera | Esc: back',
-  lab: '', blip: '',
+  lab: '', blip: '', tech: '',
 };
 function seedSystemCam() {
   const star = currentStar();
@@ -213,6 +226,7 @@ function setScene(name) {
   if (name === 'planet') { $('panel-planet').classList.remove('hidden'); $('panel-ops').classList.remove('hidden'); ops.enter(selectedPlanet); sysUI.renderPlanet(); }
   if (name === 'lab') { $('panel-lab').classList.remove('hidden'); lab.render(); }
   if (name === 'blip') { $('panel-blip').classList.remove('hidden'); blip.render(); }
+  if (name === 'tech') { $('panel-tech').classList.remove('hidden'); tech.render(); }
   if (name !== 'system') sysUI.hideLabels();
   tutorial.update();
 }
@@ -225,7 +239,7 @@ window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   if (scene === 'planet' && ops.key(e, true)) { e.preventDefault(); return; }
   if (jump.active) return;
-  const m = { 1: 'map', 2: 'system', 3: 'lab', 4: 'blip' }[e.key];
+  const m = { 1: 'map', 2: 'system', 3: 'lab', 4: 'blip', 5: 'tech' }[e.key];
   if (m) setScene(m);
   else if (e.key === 'Escape') { if (scene === 'planet') setScene('system'); else if (scene === 'system' && selectedPlanet) { selectedPlanet = null; sysUI.renderSystem(); } }
 });
@@ -238,6 +252,7 @@ function startGame(s, sceneName) {
   $('modal').classList.add('hidden'); $('title').classList.add('hidden');
   Object.assign(camSys, SYSTEM_CAM); camStar = null; Object.assign(camPlanet, PLANET_CAM);
   ops.reset(); sysUI.resetNotes(); lab.reset(); blip.reset(); rockybar.reset(); mapView.select(null);
+  eventCard.reset(); tech.reset(); board.clear();
   hud.show(true); hud.update(state); hud.renderLog(state);
   setScene(sceneName || 'map');
 }
@@ -265,6 +280,13 @@ function quit() {
 }
 $('btn-new').addEventListener('click', () => newGame('map'));
 $('btn-continue').addEventListener('click', continueGame);
+$('btn-endless').addEventListener('click', () => {
+  tutorial.suppress();   // endless starts straight into the front, no tutorial
+  const s = sim.startEndless(Date.now() & 0xffff);
+  if (s.campaign && s.campaign.pendingCard) s.campaign.pendingCard = null;   // our own card below
+  startGame(s, 'map'); save();
+  actCard({ kicker: 'ENDLESS', title: 'PETROVA FRONT', subtitle: 'Hold the line as long as you can.' });
+});
 $('btn-quit').addEventListener('click', quit);
 $('btn-tut').addEventListener('click', () => {
   tutorial.replay();
@@ -342,10 +364,20 @@ function frame(now) {
   let planetFrame = {};
   if (scene === 'planet') { const ps = currentStar().planets.find((x) => x.id === selectedPlanet); planetFrame = ops.frame(dt, ps || null); }
   else planetFrame = ops.frame(dt, null);
-  P.e('ops'); P.b('hud'); hud.update(state); hud.renderLog(state); P.e('hud'); P.b('objective'); objective.update(state); P.e('objective');
+  P.e('ops'); P.b('hud'); hud.update(state); hud.renderLog(state); P.e('hud');
+  P.b('objective');
+  if ((state.campaign?.act ?? 1) >= 2) board.update(state);
+  else { board.clear(); objective.update(state); }
+  P.e('objective');
+  eventCard.update(state); tech.update(state);
   P.b('rocky'); rockybar.update(state); P.e('rocky');
   P.b('tutorial'); tutorial.tick(now); P.e('tutorial');
   if (state.status !== 'playing') checkEnd();
+  if (state.campaign && state.campaign.pendingCard) {
+    const card = state.campaign.pendingCard;
+    state.campaign.pendingCard = null;
+    actCard(card); save();
+  }
   if (scene === 'map') { P.b('map'); mapView.draw(state, t); P.e('map'); }
   else if (renderer) {
     try {

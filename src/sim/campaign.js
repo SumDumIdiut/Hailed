@@ -88,7 +88,6 @@ export function advanceAct(state) {
     c.act = 2;
     seedAct2(state, c);
     c.pendingCard = { kicker: 'ACT II', title: 'THE SPREAD', subtitle: 'Astrophage has found a hundred more worlds. Save what you can.' };
-    addLog(state, 'A full-screen card announces ACT II: THE SPREAD.');
     refreshBoard(state);
     return true;
   }
@@ -97,7 +96,6 @@ export function advanceAct(state) {
     c.act = 3;
     seedAct3(state, c);
     c.pendingCard = { kicker: 'ACT III', title: 'THE LANES', subtitle: 'Follow the Cartographers outward to the Source.' };
-    addLog(state, 'A full-screen card announces ACT III: THE LANES.');
     refreshBoard(state);
     return true;
   }

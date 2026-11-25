@@ -550,7 +550,9 @@ export function drawMapFrame(g, W, H, timeSec, ctx) {
   g.save();
   g.setLineDash([]); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   P.b('m.bg'); drawBackground(g, W, H, timeSec, ctx.cam); P.e('m.bg'); P.b('m.grid');
-  if (ctx.gridProject) drawGrid(g, ctx.gridProject, ctx.gridR || 4, { labels: false, alpha: .05 }); P.e('m.grid'); P.b('m.stem');
+  if (ctx.gridProject) drawGrid(g, ctx.gridProject, ctx.gridR || 4, { labels: false, alpha: .05 }); P.e('m.grid'); P.b('m.lanes');
+  for (const l of ctx.lanes || []) { if (l.from && l.to) drawLane(g, l.from.x, l.from.y, l.to.x, l.to.y, l.infection, timeSec); }
+  P.e('m.lanes'); P.b('m.stem');
   let zmin = Infinity, zmax = -Infinity;
   for (const s of stars) { zmin = Math.min(zmin, s.depth || 0); zmax = Math.max(zmax, s.depth || 0); }
   const zr = Math.max(1e-6, zmax - zmin);
@@ -578,9 +580,41 @@ export function drawMapFrame(g, W, H, timeSec, ctx) {
   if (route && route.from && route.to) drawRoute(g, route.from.x, route.from.y, route.to.x, route.to.y, timeSec);
   for (const s of order) {
     const r = radius(s), n = near(s);
+    if (s.smudge) {
+      g.save(); g.globalAlpha = 0.35;
+      g.fillStyle = 'rgba(180,190,210,0.5)';
+      g.beginPath(); g.arc(s.x, s.y, 3.5, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(200,210,230,0.7)';
+      g.font = '600 9px "Liberation Sans Narrow","DejaVu Sans Condensed",sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('?', s.x, s.y + 0.5);
+      g.textBaseline = 'alphabetic';
+      g.restore();
+      continue;
+    }
+    if (s.saved) {
+      g.save(); g.globalCompositeOperation = 'lighter';
+      const R = r * 2.2;
+      const gr = g.createRadialGradient(s.x, s.y, 0, s.x, s.y, R);
+      gr.addColorStop(0, 'rgba(94,196,216,0.35)'); gr.addColorStop(1, 'rgba(94,196,216,0)');
+      g.fillStyle = gr; g.fillRect(s.x - R, s.y - R, R * 2, R * 2);
+      g.restore();
+    }
     g.globalAlpha = .82 + .18 * n;
-    drawStarMarker(g, s.x, s.y, r, s.star, { t: timeSec, hover: s.hovered, selected: s.selected, lum: clamp(Math.log10(1 + Math.max(0, s.star.lum ?? 1) * 8) / 1.5, 0, 1) });
+    if (s.dark) {
+      g.save();
+      g.fillStyle = 'rgba(120,120,130,0.6)';
+      g.beginPath(); g.arc(s.x, s.y, Math.max(2, r * 0.6), 0, Math.PI * 2); g.fill();
+      g.restore();
+    } else {
+      drawStarMarker(g, s.x, s.y, r, s.star, { t: timeSec, hover: s.hovered, selected: s.selected, lum: clamp(Math.log10(1 + Math.max(0, s.star.lum ?? 1) * 8) / 1.5, 0, 1) });
+    }
     g.globalAlpha = 1;
+    if (s.relay && s.relayRadiusPx) {
+      g.save(); g.strokeStyle = 'rgba(94,196,216,0.35)'; g.lineWidth = 1.5; g.setLineDash([4, 4]); g.lineDashOffset = -timeSec * 4;
+      g.beginPath(); g.arc(s.x, s.y, s.relayRadiusPx, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+      g.restore();
+    }
   }
   for (const s of order) {
     const r = radius(s);
@@ -596,7 +630,11 @@ export function drawMapFrame(g, W, H, timeSec, ctx) {
     g.strokeStyle = 'rgba(214,162,58,.8)'; g.lineWidth = 1; g.strokeRect(mx - tw / 2 + .5, my - 9.5, tw - 1, 19);
     g.fillStyle = '#ffd27a'; g.textAlign = 'center'; g.fillText(tx, mx, my + 4.5); g.restore();
   }
-  P.e('m.mark'); P.b('m.lab');
+  P.e('m.mark'); P.b('m.pois');
+  for (const p of ctx.pois || []) drawPoi(g, p.x, p.y, p.kind, p.source, timeSec, p.hovered);
+  P.e('m.pois'); P.b('m.beetles');
+  for (const b of ctx.beetles || []) drawBeetle(g, b.x, b.y, timeSec);
+  P.e('m.beetles'); P.b('m.lab');
   g.save();
   if ('letterSpacing' in g) g.letterSpacing = '.5px';
   const bounds = ctx.bounds || { l: 6, t: 96, r: W - 6, b: H - 36 };
@@ -608,6 +646,61 @@ export function drawMapFrame(g, W, H, timeSec, ctx) {
   for (const L of layoutLabels(g, ents, W, H, bounds)) paintLabel(g, L.e, L.m, L.box, L.leader);
   g.restore();
   g.restore(); P.e('m.lab');
+}
+
+
+export function drawLane(g, x1, y1, x2, y2, infection, timeSec = 0) {
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  if (len < 4) return;
+  const inf = clamp(infection || 0, 0, 1);
+  g.save();
+  g.lineCap = 'butt';
+  const r = Math.round(200 + 30 * inf), gg = Math.round(120 - 40 * inf), b = 50;
+  g.strokeStyle = `rgba(${r},${gg},${b},${0.18 + 0.45 * inf})`;
+  g.lineWidth = 0.8 + 1.2 * inf;
+  g.setLineDash([5, 5]);
+  g.lineDashOffset = -timeSec * 6;
+  g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+  g.setLineDash([]);
+  g.restore();
+}
+
+export function drawPoi(g, x, y, kind, source, timeSec = 0, hovered = false) {
+  g.save();
+  if (source) {
+    const pulse = 0.5 + 0.5 * Math.sin(timeSec * 3);
+    const R = 10 + pulse * 6;
+    g.globalCompositeOperation = 'lighter';
+    const gr = g.createRadialGradient(x, y, 0, x, y, R);
+    gr.addColorStop(0, 'rgba(170,90,255,0.6)'); gr.addColorStop(1, 'rgba(170,90,255,0)');
+    g.fillStyle = gr; g.fillRect(x - R, y - R, R * 2, R * 2);
+    g.globalCompositeOperation = 'source-over';
+    g.strokeStyle = 'rgba(170,90,255,0.9)'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(x, y, R, 0, Math.PI * 2); g.stroke();
+  }
+  const colors = { derelict: '#c9a2ff', rogue: '#ff7a7a', cloud: '#7adfff', buoy: '#ffd27a', nebula: '#b388ff', wreck: '#ff9b6a' };
+  const col = colors[kind] || '#ffffff';
+  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.5;
+  const r = 4;
+  if (kind === 'derelict') { g.strokeRect(x - r, y - r, r * 2, r * 2); }
+  else if (kind === 'rogue') { g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r, y); g.lineTo(x, y + r); g.lineTo(x - r, y); g.closePath(); g.stroke(); }
+  else if (kind === 'cloud') { g.globalAlpha = 0.7; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
+  else if (kind === 'buoy') { g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r, y + r); g.lineTo(x - r, y + r); g.closePath(); g.stroke(); }
+  else if (kind === 'nebula') { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(x, y, r * 0.5, 0, Math.PI * 2); g.fill(); }
+  else if (kind === 'wreck') { g.beginPath(); g.moveTo(x - r, y - r); g.lineTo(x + r, y + r); g.moveTo(x + r, y - r); g.lineTo(x - r, y + r); g.stroke(); }
+  else { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke(); }
+  if (hovered) {
+    g.strokeStyle = 'rgba(255,226,150,.9)'; g.lineWidth = 1.5;
+    g.beginPath(); g.arc(x, y, r + 3, 0, Math.PI * 2); g.stroke();
+  }
+  g.restore();
+}
+
+export function drawBeetle(g, x, y, timeSec = 0) {
+  g.save();
+  g.fillStyle = '#d6a23a';
+  g.beginPath(); g.arc(x, y, 2.5, 0, Math.PI * 2); g.fill();
+  g.restore();
 }
 
 export default { drawMapFrame, drawBackground, drawStarGlow, drawStarMarker, drawInfection, drawPetrovaLink, drawGrid, drawStem, drawShip, drawRoute, drawSelection };

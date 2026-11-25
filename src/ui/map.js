@@ -1,5 +1,7 @@
 import * as fx from './mapfx.js';
 import { rgb, clamp, esc, row, fmt, attachOrbit } from './util.js';
+import * as sim from '../sim/index.js';
+import { starDistance } from '../sim/stars.js';
 
 const PETROVA_LY = 6;
 const TAGS = { sol: 'Earth \u00b7 target', eri40: 'Erid \u00b7 target' };
@@ -7,7 +9,23 @@ export function createMap(canvas, tooltipEl, hooks) {
   const g = canvas.getContext('2d');
   const cam = { yaw: 0.5, pitch: 0.55, dist: 1 }; // dist = zoom
   let route = null, proj = [], hover = null, selected = null, mouse = { x: 0, y: 0 }, W = 1, H = 1, dpr = 1, state = null;
+  let drawStars = [], poiProj = [];
   attachOrbit(canvas, cam, { min: 0.4, max: 4 }, () => {});
+
+  function isKnownStar(st, star) {
+    if (!st || !st.galaxy || !st.galaxy.known || typeof st.galaxy.known !== 'object') return true;
+    return !!st.galaxy.known[star.id];
+  }
+  function visibleStarsOf(st) {
+    const known = st.stars.filter((s) => isKnownStar(st, s));
+    const smudges = st.stars.filter((s) => !isKnownStar(st, s) && known.some((k) => starDistance(s, k) <= 4));
+    return [...known, ...smudges];
+  }
+  function relayRadiusLy(st) {
+    let base = 10;
+    try { const mods = sim.modifiers(st, { techs: sim.techDefs() }); base += (mods.adds?.relayRadiusAdd || 0); } catch (_) {}
+    return base;
+  }
   let viewKey = '';
   // Default view: grid-search yaw/pitch for the one that maximises the smallest projected gap between stars.
   function bestView() {
@@ -48,7 +66,8 @@ export function createMap(canvas, tooltipEl, hooks) {
   canvas.addEventListener('click', (e) => {
     if (canvas._dragMoved > 4) return;
     mouse = { x: e.clientX, y: e.clientY }; updateHover();
-    if (hover) { selected = hover.star.id; hooks.onSelect(hover.star); }
+    if (hover && hover.star) { selected = hover.star.id; hooks.onSelect(hover.star); }
+    else if (hover && hover.poi) { /* POIs are not selectable; tooltip already shown */ }
     else if (selected) { selected = null; hooks.onSelect(null); }
   });
   function resize() {
@@ -58,7 +77,7 @@ export function createMap(canvas, tooltipEl, hooks) {
   }
   window.addEventListener('resize', resize); resize();
 
-  function maxR() { return Math.max(4, ...state.stars.map((s) => Math.hypot(...s.pos))); }
+  function maxR() { return Math.max(4, ...drawStars.map((s) => Math.hypot(...s.pos))); }
   // Unscaled perspective projection (ly-ish units, y up). The screen mapping comes from fitView().
   function raw(p, R) {
     const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
@@ -79,7 +98,7 @@ export function createMap(canvas, tooltipEl, hooks) {
   }
   function fitView(R) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (const s of state.stars) for (const q of [s.pos, [s.pos[0], 0, s.pos[2]]]) {
+    for (const s of drawStars) for (const q of [s.pos, [s.pos[0], 0, s.pos[2]]]) {
       const r = raw(q, R);
       x0 = Math.min(x0, r.rx); x1 = Math.max(x1, r.rx); y0 = Math.min(y0, r.ry); y1 = Math.max(y1, r.ry);
     }
@@ -97,6 +116,21 @@ export function createMap(canvas, tooltipEl, hooks) {
     return { x: fit.ox + (r.rx - fit.cx) * k, y: fit.oy + (r.ry - fit.cy) * k, f: r.f, z: r.z };
   }
   function updateHover() {
+    // POIs first
+    let bestPoi = null, bestPoiD = 14;
+    for (const pp of poiProj) {
+      const d = Math.hypot(pp.x - mouse.x, pp.y - mouse.y);
+      if (d < bestPoiD) { bestPoiD = d; bestPoi = pp; }
+    }
+    if (bestPoi) {
+      hover = { poi: bestPoi.poi, x: bestPoi.x, y: bestPoi.y };
+      canvas.style.cursor = 'pointer';
+      tooltipEl.innerHTML = `<b>${esc(bestPoi.poi.name.toUpperCase())}</b>` + row('Type', esc(bestPoi.poi.kind));
+      tooltipEl.classList.remove('hidden');
+      tooltipEl.style.left = Math.min(mouse.x + 16, W - 200) + 'px';
+      tooltipEl.style.top = Math.min(mouse.y + 16, H - 130) + 'px';
+      return;
+    }
     hover = null; let best = 16;
     for (const p of proj) {
       const d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
@@ -123,13 +157,14 @@ export function createMap(canvas, tooltipEl, hooks) {
 
   function draw(st, t) {
     state = st;
+    drawStars = visibleStarsOf(st);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     const R = maxR();
     const key = st.stars.map((s) => s.id).join(',') + '|' + Math.round(W / 40) + 'x' + Math.round(H / 40);
     if (key !== viewKey) { viewKey = key; resetView(); }
     fitView(R);
-    proj = st.stars.map((s) => {
+    proj = drawStars.map((s) => {
       const p = project(s.pos, R);
       const base = project([s.pos[0], 0, s.pos[2]], R);
       return { star: s, x: p.x, y: p.y, tx: p.x, ty: p.y, f: p.f, z: p.z, bx: base.x, by: base.y,
@@ -161,15 +196,74 @@ export function createMap(canvas, tooltipEl, hooks) {
       if (d > PETROVA_LY) continue;
       links.push({ a, b, strength: Math.min(a.star.infection, b.star.infection) * (1 - d / PETROVA_LY) * 1.4 });
     }
+    // galaxy lanes between known stars
+    const byId = new Map(proj.map((p) => [p.star.id, p]));
+    const galaxyLanes = [];
+    if (st.galaxy && Array.isArray(st.galaxy.lanes)) {
+      for (const l of st.galaxy.lanes) {
+        const sa = st.stars.find((x) => x.id === l.a);
+        const sb = st.stars.find((x) => x.id === l.b);
+        if (!isKnownStar(st, sa) || !isKnownStar(st, sb)) continue;
+        const pa = byId.get(l.a), pb = byId.get(l.b);
+        if (!pa || !pb) continue;
+        galaxyLanes.push({ from: { x: pa.x, y: pa.y }, to: { x: pb.x, y: pb.y },
+          infection: Math.max(sa?.infection || 0, sb?.infection || 0) });
+      }
+    }
+    // POIs visible
+    const rRelay = relayRadiusLy(st);
+    const visiblePois = [];
+    for (const poi of (st.pois || [])) {
+      let vis = !!(poi.known || poi.revealed);
+      if (!vis) {
+        for (const s of st.stars) {
+          if (!isKnownStar(st, s)) continue;
+          if (starDistance(s, { pos: poi.pos }) <= 6) { vis = true; break; }
+        }
+      }
+      if (!vis) {
+        for (const rid of (st.galaxy?.relays || [])) {
+          const rs = st.stars.find((x) => x.id === rid);
+          if (rs && starDistance(rs, { pos: poi.pos }) <= rRelay) { vis = true; break; }
+        }
+      }
+      if (vis) visiblePois.push(poi);
+    }
+    poiProj = visiblePois.map((poi) => {
+      const p = project(poi.pos, R);
+      return { poi, x: p.x, y: p.y, r: 6 };
+    });
+    // beetles
+    const beetleDots = [];
+    for (const b of (st.beetles || [])) {
+      if (b.status !== 'flying') continue;
+      const pa = proj.find((q) => q.star.id === b.from);
+      const pb = proj.find((q) => q.star.id === b.to);
+      if (!pa || !pb) continue;
+      const span = Math.max(1e-9, b.arriveWorldYears - b.departWorldYears);
+      let f = (st.time.worldYears - b.departWorldYears) / span;
+      f = clamp(f, 0, 1);
+      beetleDots.push({ x: pa.x + (pb.x - pa.x) * f, y: pa.y + (pb.y - pa.y) * f });
+    }
+    const pxPerLy = fit.sc / cam.dist;
     fx.drawMapFrame(g, W, H, t, {
       cam, gridProject: project, gridR: R,
       stars: proj.map((p) => ({
         x: p.x, y: p.y, tx: p.tx, ty: p.ty, r: p.r, depth: p.z, f: p.f, bx: p.bx, by: p.by, star: p.star,
-        isShip: p.star.id === st.ship.starId, selected: p.star.id === selected, hovered: hover === p,
-        tag: TAGS[p.star.id],
+        isShip: p.star.id === st.ship.starId, selected: p.star.id === selected, hovered: hover && hover.star && hover.star.id === p.star.id,
+        tag: p.star.saved ? 'SAVED' : p.star.dark ? 'DARK' : TAGS[p.star.id],
         sub: p.star.infection > 0.05 ? Math.round(p.star.infection * 100) + '% infected' : undefined,
+        smudge: !isKnownStar(st, p.star),
+        saved: !!p.star.saved,
+        dark: !!p.star.dark,
+        relay: (st.galaxy?.relays || []).includes(p.star.id),
+        relayRadiusPx: (st.galaxy?.relays || []).includes(p.star.id) ? relayRadiusLy(st) * pxPerLy : 0,
       })),
       links,
+      lanes: galaxyLanes,
+      pois: poiProj.map((pp) => ({ x: pp.x, y: pp.y, kind: pp.poi.kind, source: !!pp.poi.source,
+        hovered: hover && hover.poi && hover.poi.id === pp.poi.id })),
+      beetles: beetleDots,
       route: undefined,
       routeLabel: routeText(st, proj),
     });
@@ -193,5 +287,57 @@ export function createMap(canvas, tooltipEl, hooks) {
   }
   // Marker + label rect of every star (a label sits to the right of its marker): the map's own "controls" for the tutorial.
   const starRects = () => proj.map((p) => ({ left: p.x - 14, top: p.y - p.r - 6, right: p.x + 124, bottom: p.y + p.r + 22, width: 138, height: 2 * p.r + 28 }));
+  function augmentPanel(star) {
+    if (!star || !state) return;
+    if (!isKnownStar(state, star)) return;
+    const p = document.getElementById('panel-map');
+    if (!p || p.classList.contains('hidden')) return;
+    const profile = sim.biosphereProfile(star);
+    const g = state.genetics || { strains: [], best: null };
+    const strains = g.strains || [];
+    const bestStrain = strains.find((x) => x.id === g.best) || strains[strains.length - 1] || null;
+    const cov = bestStrain ? sim.coverage(bestStrain, profile) : 0;
+    let bios = '<div class="bio-block">';
+    bios += '<h4>BIOSPHERE</h4><div class="bio-traits">';
+    for (const t of sim.BIOSPHERE) {
+      bios += `<div class="bio-row"><span>${String(t).toUpperCase()}</span><div class="bio-bar"><i style="width:${Math.round((profile[t] || 0) * 100)}%"></i></div><span>${Math.round((profile[t] || 0) * 100)}%</span></div>`;
+    }
+    bios += '</div>';
+    bios += `<div class="row"><span>Coverage (best strain)</span><span>${Math.round(cov * 100)}%</span></div>`;
+    bios += '<div class="btns">';
+    if (star.id === state.ship.starId) bios += '<button class="small" id="map-build-relay">BUILD RELAY</button>';
+    bios += `<button class="small" id="map-launch-beetle" ${bestStrain ? '' : 'disabled'}>LAUNCH BEETLE</button>`;
+    bios += '</div>';
+    bios += `<div class="note">Beetle cost: ${sim.BEETLE_COST.fuelKg} kg fuel, ${sim.BEETLE_COST.materials.minerals} minerals, ${sim.BEETLE_COST.materials.silicates} silicates.</div>`;
+    bios += '<div id="map-beetle-reason" class="res hidden"></div>';
+    bios += '</div>';
+    const existing = p.querySelector('.bio-block');
+    if (existing) existing.outerHTML = bios;
+    else p.insertAdjacentHTML('beforeend', bios);
+
+    const rb = p.querySelector('#map-build-relay');
+    if (rb) rb.addEventListener('click', () => {
+      const r = sim.buildRelay(state, star.id);
+      document.dispatchEvent(new CustomEvent('hailed:action', { detail: { text: r ? 'Relay built.' : 'Relay already exists.', bad: !r } }));
+      augmentPanel(star);
+    });
+    const lb = p.querySelector('#map-launch-beetle');
+    if (lb) lb.addEventListener('click', () => {
+      if (!bestStrain) return;
+      const r = sim.launchBeetle(state, bestStrain.id, star.id);
+      const reasonEl = p.querySelector('#map-beetle-reason');
+      if (r.ok) {
+        if (reasonEl) reasonEl.classList.add('hidden');
+        document.dispatchEvent(new CustomEvent('hailed:action', { detail: { text: `Beetle probe ${r.beetle.id} launched.`, bad: false } }));
+      } else {
+        if (reasonEl) { reasonEl.textContent = r.why; reasonEl.classList.remove('hidden'); }
+        document.dispatchEvent(new CustomEvent('hailed:action', { detail: { text: r.why, bad: true } }));
+      }
+      augmentPanel(star);
+    });
+  }
+  const originalOnSelect = hooks.onSelect;
+  hooks.onSelect = (star) => { if (originalOnSelect) originalOnSelect(star); augmentPanel(star); };
+
   return { setRoute(r) { route = r; }, starRect, starRects, draw, resize, get selected() { return selected; }, select(id) { selected = id; }, get cam() { return cam; } };
 }

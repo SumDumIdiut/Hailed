@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HAILED</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style-expansion.css">
 </head>
 <body>
 
@@ -43,6 +44,7 @@
         <button data-scene="system" title="System helm (2)"><i class="lamp"></i><span>System</span><b>2</b></button>
         <button data-scene="lab" title="Xenonite lab (3)"><i class="lamp"></i><span>Lab</span><b>3</b></button>
         <button data-scene="blip" title="Blip-A (4)"><i class="lamp"></i><span>Blip-A</span><b>4</b></button>
+        <button data-scene="tech" title="Tech tree (5)"><i class="lamp"></i><span>Tech</span><b>5</b></button>
         <button id="btn-save" class="ghost" title="Save now"><span>Save</span></button>
       </nav>
       <div id="objective" class="hidden"><span class="k">Directive <b id="obj-stage"></b></span><span class="goal" id="obj-goal"></span><span class="act" id="obj-act"></span></div>
@@ -56,6 +58,7 @@
   <div id="runbar" class="hidden"><i></i><span>SKIMMING THE PETROVA LINE</span></div>
   <section id="panel-lab" class="panel center hidden"></section>
   <section id="panel-blip" class="panel center hidden"></section>
+  <section id="panel-tech" class="panel center hidden"></section>
 
   <div id="tooltip" class="hidden"></div>
   <div id="toast" class="hidden"></div>
@@ -99,12 +102,13 @@
         <div class="title-btns">
           <button id="btn-new" class="primary">New game</button>
           <button id="btn-continue">Continue</button>
+          <button id="btn-endless" class="ghost">Endless</button>
           <button id="btn-tut" class="ghost">Replay tutorial</button>
           <button id="btn-quit" class="ghost">Quit</button>
         </div>
       </div>
     </div>
-    <div class="foot">Drag: rotate &middot; Wheel: zoom &middot; 1-4: switch station &middot; Esc / Space: skip burn &middot; F11: fullscreen</div>
+    <div class="foot">Drag: rotate &middot; Wheel: zoom &middot; 1-5: switch station &middot; Esc / Space: skip burn &middot; F11: fullscreen</div>
     <div class="v02-dev">v0.2-dev</div>
   </div>
 
