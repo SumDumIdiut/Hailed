@@ -3,7 +3,7 @@
 import { createRng, mixSeed, hashStr } from './rng.js';
 import { addLog } from './util.js';
 import { findStar, starDistance } from './stars.js';
-import { revealAround } from './galaxy.js';
+import { revealAround, extendGalaxy, extendLanes, genPois, initKnowledge } from './galaxy.js';
 import { BIOSPHERE, biosphereProfile, canSave, coverage, geneticsOf } from './genetics.js';
 import { extinctionYears, updateLum } from './astrophage.js';
 import { createGame } from './index.js';
@@ -12,6 +12,14 @@ const TARGETS = 12;
 const DARK_LUM = 0.3;
 const CYCLE_SAVES = 6;
 const SOURCE_PROFILE = Object.fromEntries(BIOSPHERE.map((t) => [t, 0.9]));
+const FRONTIER_WORK = 6;         // expand when fewer than this many reachable worlds are left to save
+const FRONTIER_SHELL = 16;       // stars per new shell
+const STAR_CAP = 400;            // live stars in the lane graph; older dark ones are recycled
+const CORE_IDS = new Set(['sol', 'tauceti', 'eri40']);
+
+const radiusOf = (s) => (s && s.pos ? Math.hypot(s.pos[0], s.pos[1], s.pos[2]) : 0);
+const distanceOf = (a, b) => (a && b && a.pos && b.pos
+  ? Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]) : Infinity);
 
 // Old saves and hand-built states get the same shape as createGame.
 export function ensureCampaign(state) {
@@ -151,6 +159,116 @@ const starYears = (state, id) => {
   return Number.isFinite(y) ? +Math.min(200, Math.max(0, y)).toFixed(4) : 0;
 };
 
+// Work the player can still reach along the current lane graph. Redundant with travel
+// range (the ship can jump anywhere a tank allows), but it keeps dark backwaters from
+// counting as a reason to postpone the next shell.
+function reachableWork(state) {
+  const neighbors = new Map();
+  for (const l of state.galaxy?.lanes || []) {
+    if (!neighbors.has(l.a)) neighbors.set(l.a, []);
+    if (!neighbors.has(l.b)) neighbors.set(l.b, []);
+    neighbors.get(l.a).push(l.b);
+    neighbors.get(l.b).push(l.a);
+  }
+  const queue = [state.ship?.starId].filter(Boolean);
+  const seen = new Set(queue);
+  for (let i = 0; i < queue.length; i++) {
+    for (const next of neighbors.get(queue[i]) || []) {
+      if (!seen.has(next)) { seen.add(next); queue.push(next); }
+    }
+  }
+  let n = 0;
+  for (const id of seen) {
+    if (!state.galaxy?.known?.[id]) continue;
+    const s = findStar(state, id);
+    if (s && !s.saved && !s.dark && !s.recycled) n++;
+  }
+  return n;
+}
+
+// Over the cap, retire the least useful stars from the *active* galaxy. They stay in
+// state.stars (and in the score/history arrays), but leave lanes, knowledge and relays
+// so the bot and the mission board only see the moving frontier. Dark inner stars go first.
+function recycleBackwaters(state) {
+  const all = state.stars || [];
+  let overflow = all.filter((s) => !s.recycled).length + FRONTIER_SHELL - STAR_CAP;
+  if (overflow <= 0) return all.filter((s) => !s.recycled);
+  const candidates = all.filter((s) => !s.recycled && !CORE_IDS.has(s.id) && s.id !== state.ship?.starId);
+  candidates.sort((a, b) => (Number(!!b.dark) - Number(!!a.dark))
+    || (radiusOf(a) - radiusOf(b)) || String(a.id).localeCompare(String(b.id)));
+  const retired = new Set();
+  for (const s of candidates) {
+    if (overflow <= 0) break;
+    s.recycled = true;
+    retired.add(s.id);
+    overflow--;
+  }
+  const gal = state.galaxy;
+  if (gal) {
+    if (Array.isArray(gal.lanes)) gal.lanes = gal.lanes.filter((l) => !retired.has(l.a) && !retired.has(l.b));
+    if (gal.known) for (const id of retired) delete gal.known[id];
+    if (gal.surveyed) for (const id of retired) delete gal.surveyed[id];
+    if (Array.isArray(gal.relays)) gal.relays = gal.relays.filter((id) => !retired.has(id));
+  }
+  return all.filter((s) => !s.recycled);
+}
+
+// One outward shell of the Petrova Front. Every call derives a fresh seed and radial
+// band from the cycle, so old saves replay identically and ids stay unique forever.
+export function moveFrontier(state) {
+  const c = ensureCampaign(state);
+  if (state.status !== 'playing' || c.mode !== 'endless') return 0;
+  const cycle = Math.max(1, c.cycle || 1);
+  const seed = mixSeed(state.seed ?? 1, hashStr(`petrova-frontier-${cycle}`));
+  const rng = createRng(seed);
+  let maxR = 0;
+  for (const s of state.stars || []) if (!s.recycled) maxR = Math.max(maxR, radiusOf(s));
+  const living = recycleBackwaters(state);
+  const count = Math.min(FRONTIER_SHELL, Math.max(0, STAR_CAP - living.length));
+  if (!count) return 0;
+  if (!state.galaxy) initKnowledge(state);
+  const shell = extendGalaxy(living, seed, {
+    count, radiusLy: maxR + 10, innerRadiusLy: maxR + 4, idPrefix: `g${cycle}`,
+  });
+  for (const s of shell) { s.procedural = true; s.frontierCycle = cycle; }
+  // Difficulty raises both the number of new detections and their bite, but a fresh
+  // world must have time to be saved before it goes dark.
+  const infected = Math.min(shell.length, Math.max(FRONTIER_WORK,
+    Math.round(shell.length * Math.min(0.65, 0.35 + 0.05 * c.difficulty))));
+  const slots = shell.map((_, i) => i);
+  for (let i = 0; i < infected; i++) {
+    const j = i + rng.int(0, slots.length - 1 - i);
+    const tmp = slots[i]; slots[i] = slots[j]; slots[j] = tmp;
+  }
+  for (const idx of slots.slice(0, infected)) {
+    const s = shell[idx];
+    s.infection = +Math.min(0.45, (0.05 + rng.next() * 0.08) * Math.min(3, c.difficulty)).toFixed(4);
+    updateLum(s);
+  }
+  state.stars.push(...shell);
+  extendLanes(state, shell);
+  // Reveal the closest arrivals and every new Astrophage signature along the way.
+  const here = findStar(state, state.ship.starId);
+  const near = shell.slice().sort((a, b) => distanceOf(a, here) - distanceOf(b, here)
+    || String(a.id).localeCompare(String(b.id)));
+  const reveal = new Set(near.slice(0, FRONTIER_WORK).map((s) => s.id));
+  for (const s of shell) if (s.infection > 0.02) reveal.add(s.id);
+  for (const id of reveal) state.galaxy.known[id] = true;
+  if (near[0]) revealAround(state, near[0].id, 2);
+  const pois = genPois(shell, mixSeed(seed, 0x501), {
+    count: 4, buoys: 1, idPrefix: `poi-c${cycle}`, startIndex: (state.pois || []).length,
+  });
+  for (const p of pois) { p.known = false; p.revealed = false; }
+  state.pois = (state.pois || []).concat(pois);
+  if (near[0]) {
+    const closest = pois.slice().sort((a, b) => distanceOf({ pos: a.pos }, near[0]) - distanceOf({ pos: b.pos }, near[0]));
+    for (const p of closest.slice(0, 2)) { p.known = true; p.revealed = true; }
+  }
+  c.frontierCycle = cycle;
+  addLog(state, `The frontier moves out: ${shell.length} new stars.`);
+  return shell.length;
+}
+
 // Shared credit path for ship and beetle deliveries. years is the pre-delivery extinction estimate.
 function creditSave(state, star, strain, via, years) {
   const c = ensureCampaign(state);
@@ -172,6 +290,8 @@ function creditSave(state, star, strain, via, years) {
         }
       }
       addLog(state, `Petrova Front cycle ${c.cycle}: the spread grows 15% faster (difficulty ${c.difficulty}).`);
+      // Each cycle is a fresh wave of work, even if the old shell is not exhausted yet.
+      moveFrontier(state);
     }
   }
   checkFinal(state);
@@ -358,6 +478,10 @@ export function campaignTick(state) {
       addLog(state, `${s.name} has gone dark. The Astrophage has taken another world.`);
     }
   }
+  // Endless never runs dry: a new cycle opens a shell, and a thin frontier opens one early.
+  if (c.mode === 'endless' && state.status === 'playing') {
+    if (c.cycle > (c.frontierCycle ?? 0) || reachableWork(state) < FRONTIER_WORK) moveFrontier(state);
+  }
   // Act III has an ending of its own: ten lane worlds lost, or twelve centuries of
   // drifting without an answer. Neither the Source nor the bot can soft-lock the act.
   if (c.mode === 'campaign' && c.act >= 3) {
@@ -401,6 +525,7 @@ export function startEndless(seed = 1) {
   c.act = 2;
   c.cycle = 0;
   c.difficulty = 1;
+  c.frontierCycle = 0;
   seedAct2(state, c);
   c.pendingCard = { kicker: 'PETROVA FRONT', title: 'ENDLESS', subtitle: 'Save worlds, raise the score, and survive each harder cycle.' };
   addLog(state, 'PETROVA FRONT: endless mode. Every six worlds saved, the spread grows 15% harder.');

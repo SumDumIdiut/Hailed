@@ -11,6 +11,15 @@ test('autoplay: a bounded greedy run plays without exceptions and reaches act II
   assert.ok(r.actions <= 3000, `the bot should respect the action budget, used ${r.actions}`);
 });
 
+// The Petrova Front used to exhaust the 60-star galaxy and report "no legal action"
+// after ~45 saves. A bounded endless run must keep finding work across several cycles.
+test('autoplay: endless frontier reaches cycle 3 without getting stuck', () => {
+  const r = playSeed(2, { endless: true, maxActions: 3000, maxWorldYears: 1500 });
+  assert.equal(r.stuck, false, `stuck: ${r.stuckReason}`);
+  assert.ok(r.cycle >= 3, `only reached cycle ${r.cycle}`);
+  assert.ok(r.starsSaved >= 18, `only saved ${r.starsSaved} stars`);
+});
+
 // A regression guard for the Act III idle loop: with no action left, world time used
 // to advance forever (0.25 years per pass) while the stuck signature changed with it.
 test('autoplay: a seeded run ends before 1500 world years with bounded actions', () => {

@@ -260,6 +260,83 @@ test('endless mode: act II from the start, cycles, score, and only sol can lose'
   assert.equal(g.status, 'lost');
 });
 
+test('endless: frontier shells bring new work, unique ids and a save round-trip', () => {
+  const g = S.startEndless(31);
+  const baseStars = g.stars.length;
+  const baseMaxRadius = Math.max(...g.stars.map((s) => Math.hypot(...s.pos)));
+  const strain = perfect(g);
+  const saveNextKnown = () => {
+    const s = g.stars.find((x) => !x.saved && !x.dark && !x.recycled && g.galaxy.known[x.id]
+      && !['sol', 'tauceti', 'eri40'].includes(x.id));
+    assert.ok(s, 'a known world is always available to save');
+    g.ship.starId = s.id;
+    const r = S.deliverStrain(g, strain.id);
+    assert.equal(r.ok, true, r.text);
+  };
+  for (let i = 0; i < 18; i++) saveNextKnown();   // three cycles' worth of saves
+  assert.equal(g.campaign.cycle, 3);
+  assert.equal(g.campaign.frontierCycle, 3);
+  const frontier = g.stars.filter((s) => /^g\d+-\d+$/.test(s.id));
+  assert.ok(frontier.length >= 48, `frontier stars: ${frontier.length}`);
+  assert.ok(g.stars.length > baseStars);
+  assert.equal(new Set(g.stars.map((s) => s.id)).size, g.stars.length, 'star ids stay unique');
+  assert.equal(new Set(g.pois.map((p) => p.id)).size, g.pois.length, 'poi ids stay unique');
+  assert.ok(g.log.some((l) => /The frontier moves out: \d+ new stars\./.test(l.text)));
+  const meanRadius = (cycle) => {
+    const arr = frontier.filter((s) => Number(s.id.match(/^g(\d+)-/)[1]) === cycle);
+    assert.ok(arr.length >= 16, `cycle ${cycle} shell`);
+    return arr.reduce((a, s) => a + Math.hypot(...s.pos), 0) / arr.length;
+  };
+  assert.ok(meanRadius(1) < meanRadius(2) && meanRadius(2) < meanRadius(3), 'shells move outward');
+  for (const s of frontier) {
+    assert.ok(Math.hypot(...s.pos) > baseMaxRadius + 3.9, `${s.id} is inside the first band`);
+  }
+  // Every newcomer is on the same lane graph as the ship.
+  const neighbors = new Map();
+  for (const l of g.galaxy.lanes) {
+    if (!neighbors.has(l.a)) neighbors.set(l.a, []);
+    if (!neighbors.has(l.b)) neighbors.set(l.b, []);
+    neighbors.get(l.a).push(l.b);
+    neighbors.get(l.b).push(l.a);
+  }
+  const seen = new Set([g.ship.starId]);
+  const queue = [g.ship.starId];
+  for (let i = 0; i < queue.length; i++) {
+    for (const next of neighbors.get(queue[i]) || []) if (!seen.has(next)) { seen.add(next); queue.push(next); }
+  }
+  for (const s of frontier) assert.ok(seen.has(s.id), `${s.id} is stranded off the lane graph`);
+
+  const restored = S.deserialize(S.serialize(g));
+  assert.deepEqual(restored.campaign, g.campaign);
+  assert.deepEqual(restored.stars.map((s) => s.id), g.stars.map((s) => s.id));
+  assert.deepEqual(restored.pois.map((p) => p.id), g.pois.map((p) => p.id));
+  S.tick(restored, 0.25);
+  assert.equal(restored.status, g.status);
+});
+
+test('endless: the active galaxy is capped and retired dark stars stay in the save', () => {
+  const g = S.startEndless(41);
+  for (const s of g.stars.slice(12, 30)) { s.dark = true; s.infection = 0.95; }
+  for (let cycle = 1; cycle <= 24; cycle++) {
+    g.campaign.cycle = cycle;
+    S.moveFrontier(g);
+  }
+  const active = g.stars.filter((s) => !s.recycled);
+  const retired = g.stars.filter((s) => s.recycled);
+  assert.ok(active.length <= 400, `active stars: ${active.length}`);
+  assert.ok(retired.length > 0, 'old stars are retired rather than deleted');
+  assert.ok(retired.some((s) => s.dark), 'dark backwaters go first');
+  assert.equal(new Set(g.stars.map((s) => s.id)).size, g.stars.length);
+  const laneIds = new Set(g.galaxy.lanes.flatMap((l) => [l.a, l.b]));
+  for (const s of retired) {
+    assert.ok(!laneIds.has(s.id), `${s.id} is still on a lane`);
+    assert.ok(!g.galaxy.known[s.id], `${s.id} is still known`);
+  }
+  const restored = S.deserialize(S.serialize(g));
+  assert.equal(restored.stars.length, g.stars.length);
+  assert.equal(restored.stars.filter((s) => s.recycled).length, retired.length);
+});
+
 test('old saves migrate without growing the galaxy', () => {
   const old = {
     seed: 12, status: 'playing', statusText: '',

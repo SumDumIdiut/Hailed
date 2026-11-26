@@ -46,6 +46,22 @@ test('extendGalaxy: star shape, planets, spectral weighting', () => {
   }
 });
 
+test('extendGalaxy: frontier band and id prefix, genPois id prefix', () => {
+  const base = createStars(1);
+  const opts = { count: 16, radiusLy: 35, innerRadiusLy: 29, idPrefix: 'g2' };
+  const shell = G.extendGalaxy(base, 99, opts);
+  assert.deepEqual(shell, G.extendGalaxy(base, 99, opts));
+  assert.equal(shell.length, 16);
+  for (const s of shell) {
+    const d = Math.hypot(s.pos[0], s.pos[1], s.pos[2]);
+    assert.ok(d > 28.99 && d < 35.01, `${s.id} at ${d}`);
+    assert.match(s.id, /^g2-\d+$/);
+  }
+  const pois = G.genPois(shell, 99, { count: 4, buoys: 1, idPrefix: 'poi-c2', startIndex: 25 });
+  assert.deepEqual(pois.map((p) => p.id), ['poi-c2-25', 'poi-c2-26', 'poi-c2-27', 'poi-c2-28']);
+  assert.deepEqual(G.genPois(shell, 99, { count: 4, buoys: 1, idPrefix: 'poi-c2', startIndex: 25 }), pois);
+});
+
 test('buildLanes: graph properties', () => {
   const base = createStars(1);
   const extra = G.extendGalaxy(base, 1);

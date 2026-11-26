@@ -95,9 +95,16 @@ function genPlanets(star, seed) {
   return out;
 }
 
-export function extendGalaxy(stars, seed, { count = 48, radiusLy = 25 } = {}) {
+export function extendGalaxy(stars, seed, { count = 48, radiusLy = 25, innerRadiusLy = 0, idPrefix = 'g' } = {}) {
   const out = [];
   const existing = stars.slice();
+  // A frontier shell uses a radial band instead of a full disc, and its own id prefix so
+  // generations never collide with the original g-<n> stars (or with earlier shells).
+  const inner = Math.max(0, innerRadiusLy);
+  const banded = inner > 0;
+  const usedIds = new Set(existing.map((s) => s.id));
+  const radiusOf = (s) => (s && s.pos ? Math.hypot(s.pos[0], s.pos[1], s.pos[2]) : 0);
+  const sampleRadius = (rng) => (inner + (radiusLy - inner) * Math.cbrt(rng.next()));
   for (let i = 0; i < count; i++) {
     const rng = createRng(mixSeed(seed, hashStr(`galaxy-star-${i}`)));
     const cls = pickClass(rng);
@@ -105,7 +112,7 @@ export function extendGalaxy(stars, seed, { count = 48, radiusLy = 25 } = {}) {
     // position with spacing
     let pos = null;
     for (let attempt = 0; attempt < 5000; attempt++) {
-      const r = radiusLy * Math.cbrt(rng.next());
+      const r = sampleRadius(rng);
       const theta = Math.acos(2 * rng.next() - 1);
       const phi = rng.next() * Math.PI * 2;
       const cand = [
@@ -120,7 +127,7 @@ export function extendGalaxy(stars, seed, { count = 48, radiusLy = 25 } = {}) {
       if (ok) { pos = cand; break; }
     }
     if (!pos) {
-      const r = radiusLy * Math.cbrt(rng.next());
+      const r = sampleRadius(rng);
       const theta = Math.acos(2 * rng.next() - 1);
       const phi = rng.next() * Math.PI * 2;
       pos = [
@@ -129,7 +136,13 @@ export function extendGalaxy(stars, seed, { count = 48, radiusLy = 25 } = {}) {
         +(r * Math.cos(theta)).toFixed(3),
       ];
     }
-    const id = `g-${i}`;
+    let id = `${idPrefix}-${i}`;
+    if (usedIds.has(id)) {
+      let suffix = 1;
+      while (usedIds.has(`${idPrefix}-${i}-${suffix}`)) suffix++;
+      id = `${idPrefix}-${i}-${suffix}`;
+    }
+    usedIds.add(id);
     const spectral = `${cls}${rng.int(0, 9)}V`;
     const lum0 = +rng.range(data.lum[0], data.lum[1]).toFixed(4);
     const radius = +rng.range(data.radius[0], data.radius[1]).toFixed(2);
@@ -158,8 +171,12 @@ export function extendGalaxy(stars, seed, { count = 48, radiusLy = 25 } = {}) {
       const others = [...stars, ...out.filter((_, idx) => idx !== i)];
       const nearest = Math.min(...others.map((o) => starDistance(s, o)));
       if (nearest <= 9) continue;
+      // In a shell, only anchor on stars near the outer edge; otherwise the repair
+      // could drag a frontier star back inside the band (or into the inner galaxy).
+      const anchors = banded ? others.filter((o) => radiusOf(o) >= inner - 8) : others;
+      const pool = anchors.length ? anchors : others;
       for (let attempt = 0; attempt < 2000; attempt++) {
-        const anchor = others[Math.floor(repairRng.next() * others.length)];
+        const anchor = pool[Math.floor(repairRng.next() * pool.length)];
         const r = 3 + repairRng.next() * 6;
         const theta = Math.acos(2 * repairRng.next() - 1);
         const phi = repairRng.next() * Math.PI * 2;
@@ -169,7 +186,7 @@ export function extendGalaxy(stars, seed, { count = 48, radiusLy = 25 } = {}) {
           +(anchor.pos[2] + r * Math.cos(theta)).toFixed(3),
         ];
         const d0 = Math.hypot(cand[0], cand[1], cand[2]);
-        if (d0 > radiusLy) continue;
+        if (d0 > radiusLy || d0 < inner) continue;
         let ok = true;
         for (const o of others) if (starDistance({ pos: cand }, o) < 1.2) { ok = false; break; }
         if (!ok) continue;
@@ -201,6 +218,76 @@ export function buildLanes(stars, seed) {
     return { a, b };
   });
   lanes.sort((x, y) => (x.a + x.b).localeCompare(y.a + y.b));
+  return lanes;
+}
+
+// A new shell's lanes are rebuilt from the whole catalog, then every newcomer gets a
+// direct link to the old graph so the frontier is always one connected map.
+export function extendLanes(state, newStars) {
+  if (!state.galaxy) initKnowledge(state);
+  // Retired backwaters stay in state.stars but must not reappear on the live map.
+  const all = (state.stars || []).filter((s) => !s.recycled);
+  const byId = new Map(all.map((s) => [s.id, s]));
+  const newcomers = new Set(newStars.map((s) => s.id));
+  const key = (a, b) => [a, b].sort().join('|');
+  const lanes = buildLanes(all, state.seed ?? 1);
+  const edges = new Set(lanes.map((l) => key(l.a, l.b)));
+  for (const s of newStars) {
+    const linked = lanes.some((l) => (l.a === s.id && !newcomers.has(l.b)) || (l.b === s.id && !newcomers.has(l.a)));
+    if (linked) continue;
+    let best = null, bd = Infinity;
+    for (const o of all) {
+      if (newcomers.has(o.id)) continue;
+      const d = starDistance(s, o);
+      if (d < bd) { bd = d; best = o; }
+    }
+    if (!best) continue;
+    const k = key(s.id, best.id);
+    if (!edges.has(k)) { lanes.push({ a: s.id, b: best.id }); edges.add(k); }
+  }
+  // Local nearest-neighbour links can leave isolated components far from the ship.
+  // Stitch every component into the ship's one so the frontier is always reachable.
+  const adj = new Map();
+  for (const l of lanes) {
+    if (!adj.has(l.a)) adj.set(l.a, []);
+    if (!adj.has(l.b)) adj.set(l.b, []);
+    adj.get(l.a).push(l.b);
+    adj.get(l.b).push(l.a);
+  }
+  const visited = new Set();
+  const groups = [];
+  for (const s of all) {
+    if (visited.has(s.id)) continue;
+    const group = [], queue = [s.id];
+    visited.add(s.id);
+    for (let i = 0; i < queue.length; i++) {
+      group.push(queue[i]);
+      for (const next of adj.get(queue[i]) || []) {
+        if (!visited.has(next)) { visited.add(next); queue.push(next); }
+      }
+    }
+    groups.push(group);
+  }
+  if (groups.length > 1) {
+    const home = groups.find((g) => g.includes(state.ship?.starId)) || groups.slice().sort((a, b) => b.length - a.length)[0];
+    for (const group of groups) {
+      if (group === home) continue;
+      let bestA = null, bestB = null, bd = Infinity;
+      for (const a of group) {
+        for (const b of home) {
+          const d = starDistance(byId.get(a), byId.get(b));
+          if (d < bd) { bd = d; bestA = a; bestB = b; }
+        }
+      }
+      if (bestA) {
+        const k = key(bestA, bestB);
+        if (!edges.has(k)) { lanes.push({ a: bestA, b: bestB }); edges.add(k); }
+      }
+      home.push(...group);
+    }
+  }
+  lanes.sort((x, y) => (x.a + x.b).localeCompare(y.a + y.b));
+  state.galaxy.lanes = lanes;
   return lanes;
 }
 
@@ -317,7 +404,7 @@ export function spreadTick(state, dtYears) {
   return state;
 }
 
-export function genPois(stars, seed) {
+export function genPois(stars, seed, { count = 25, buoys = 5, idPrefix = 'poi', startIndex = 0 } = {}) {
   const rng = createRng(mixSeed((seed == null ? 0 : seed), 0x501));
   const pois = [];
   const pairList = [];
@@ -328,7 +415,7 @@ export function genPois(stars, seed) {
   }
   pairList.sort((a, b) => a.d - b.d);
   const usedPairs = new Set();
-  const buoyCount = 5;
+  const buoyCount = Math.min(buoys, count);
   for (let b = 0; b < buoyCount; b++) {
     let pair = null;
     for (const p of pairList) {
@@ -339,10 +426,10 @@ export function genPois(stars, seed) {
     const a = stars[pair.i], c = stars[pair.j];
     const mid = [(a.pos[0] + c.pos[0]) / 2, (a.pos[1] + c.pos[1]) / 2, (a.pos[2] + c.pos[2]) / 2];
     const pos = mid.map((v) => +(v + rng.range(-0.5, 0.5)).toFixed(3));
-    pois.push({ id: `poi-${pois.length}`, kind: 'buoy', pos, name: `Buoy ${b + 1}`, used: false });
+    pois.push({ id: `${idPrefix}-${startIndex + pois.length}`, kind: 'buoy', pos, name: `Buoy ${b + 1}`, used: false });
   }
   const kinds = ['derelict', 'rogue', 'cloud', 'nebula', 'wreck'];
-  while (pois.length < 25) {
+  while (pois.length < count) {
     const kind = rng.pick(kinds);
     const i = rng.int(0, stars.length - 1);
     const j = rng.int(0, stars.length - 1);
@@ -355,7 +442,7 @@ export function genPois(stars, seed) {
       const s = stars[i];
       pos = (s ? s.pos : [0, 0, 0]).map((v) => +(v + rng.range(-3, 3)).toFixed(3));
     }
-    pois.push({ id: `poi-${pois.length}`, kind, pos, name: `${kind[0].toUpperCase()}${kind.slice(1)} ${pois.length + 1}`, used: false });
+    pois.push({ id: `${idPrefix}-${startIndex + pois.length}`, kind, pos, name: `${kind[0].toUpperCase()}${kind.slice(1)} ${pois.length + 1}`, used: false });
   }
   return pois;
 }

@@ -32,6 +32,16 @@ const planetOf = (g, id) => {
   }
   return null;
 };
+const distance = (a, b) => (a && b && a.pos && b.pos
+  ? Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]) : Infinity);
+
+// The sim's relayInRange rebuilds the merged content registry on every call to read a
+// tech modifier. Cache relay centers/radius for the many checks a greedy step makes.
+function relayCoverage(g) {
+  const relays = (g.galaxy?.relays || []).map((id) => starOf(g, id)).filter(Boolean);
+  const radius = relays.length ? S.relayRadius(g) : 0;
+  return (star) => !!star && relays.some((r) => distance(star, r) <= radius);
+}
 
 // A compact fingerprint of everything the bot's decisions depend on.
 function signature(g) {
@@ -129,23 +139,39 @@ function stepActOne(g, st) {
   return true;
 }
 
+// Ids of the newest Petrova shell (g<cycle>-<n>). Once nothing nearer is left, the
+// bot works these even when they sit beyond one tank from the current system.
+function newestFrontierIds(g) {
+  const ids = new Set();
+  let newest = -1;
+  for (const s of g.stars || []) {
+    const m = /^g(\d+)-\d+$/.exec(s.id || '');
+    if (!m) continue;
+    const cycle = Number(m[1]);
+    if (cycle > newest) { newest = cycle; ids.clear(); }
+    if (cycle === newest) ids.add(s.id);
+  }
+  return ids;
+}
+
 // The threatened star the bot is currently hunting: unsaved, highest infection.
 function mostThreatened(g) {
   const c = g.campaign;
   const pool = [];
   const seen = new Set();
   const here = starOf(g, g.ship.starId);
+  const inRelay = relayCoverage(g);
   let maxLy = 26;
   for (let i = 0; i < 4; i++) maxLy = (g.ship.fuelMaxKg ?? 60000) / (1500 * (1 + 0.02 * maxLy));
-  const add = (id) => {
+  const add = (id, far = false) => {
     if (seen.has(id)) return;
     const s = starOf(g, id);
-    if (!s || s.saved || s.dark) return;
+    if (!s || s.saved || s.dark || s.recycled) return;
     if (c.act === 3 && id === c.sourceStarId && !c.sourceDelivered) return;  // saved for the final answer
     if ((g.beetles || []).some((b) => b.to === id && b.status === 'flying')) return;
-    if (here) {
+    if (here && !far) {
       const d = Math.hypot(s.pos[0] - here.pos[0], s.pos[1] - here.pos[1], s.pos[2] - here.pos[2]);
-      if (d > maxLy && !S.relayInRange(g, id)) return;   // this jump is beyond even a full tank
+      if (d > maxLy && !inRelay(s)) return;   // this jump is beyond even a full tank
     }
     seen.add(id); pool.push({ id, star: s });
   };
@@ -153,6 +179,12 @@ function mostThreatened(g) {
   if (c.mode === 'endless' || (c.act ?? 1) >= 2) {
     for (const id of c.targets || []) add(id);
     for (const id of Object.keys(g.galaxy?.known || {})) { if (!skip(id)) add(id); }
+  }
+  if (!pool.length && c.mode === 'endless') {
+    // The frontier can be one shell beyond the ship's range: fly to it (hoping through
+    // nearer systems) or send a Beetle, instead of reporting "no legal action".
+    const newest = newestFrontierIds(g);
+    for (const id of Object.keys(g.galaxy?.known || {})) if (newest.has(id)) add(id, true);
   }
   pool.sort((a, b) => b.star.infection - a.star.infection);
   return pool[0] || null;
@@ -225,8 +257,9 @@ function travelTo(g, st, id) {
 function surveyTarget(g, st, id) {
   const star = starOf(g, id);
   if (!star || star.planets.some((p) => p.scanned)) return false;
+  const inRelay = relayCoverage(g);
   if (g.ship.starId !== id) {
-    if (!S.relayInRange(g, id) && S.buildRelay(g, g.ship.starId)) { st.actions += 1; st.crafts += 1; }
+    if (!inRelay(star) && S.buildRelay(g, g.ship.starId)) { st.actions += 1; st.crafts += 1; }
     const r = S.scanPlanet(g, star.planets[0].id);
     if (r.ok) { st.actions += 1; st.scans += 1; return true; }
     return travelTo(g, st, id);
@@ -412,6 +445,7 @@ function buyAffordable(g, st) {
 // moving on to the next delivery. This is the slow, methodical half of the act.
 function galacticSurvey(g, st) {
   if ((g.campaign?.act ?? 1) !== 2) return false;
+  const inRelay = relayCoverage(g);
   for (const id of Object.keys(g.galaxy?.known || {})) {
     const s = starOf(g, id);
     const p = s?.planets.find((x) => !x.scanned);
@@ -430,7 +464,7 @@ function galacticSurvey(g, st) {
       continue;
     }
     if (g.ship.starId !== id) {
-      if (!S.relayInRange(g, id) && S.buildRelay(g, g.ship.starId)) { st.actions += 1; st.crafts += 1; return true; }
+      if (!inRelay(s) && S.buildRelay(g, g.ship.starId)) { st.actions += 1; st.crafts += 1; return true; }
       const r = S.scanPlanet(g, p.id);
       if (r.ok) { st.actions += 1; st.scans += 1; return true; }
       continue;   // do not spend a decade flying to a remote system just to scan it
@@ -618,8 +652,9 @@ export function playSeed(seed, opts = {}) {
   return {
     seed, endless,
     outcome: g.status, statusText: g.statusText,
-    act: c.act, mode: c.mode,
+    act: c.act, mode: c.mode, cycle: c.cycle ?? 0,
     starsSaved: (c.saved || []).length, starsDark: (c.dark || []).length,
+    stars: (g.stars || []).length,
     worldYears: g.time?.worldYears ?? 0,
     actions: st.actions, scans: st.scans, samples: st.samples, breeds: st.breeds,
     act2Actions: actEntered[3] ? actEntered[3].actions - (actEntered[2]?.actions ?? 0) : null,
@@ -654,7 +689,7 @@ function main() {
   const reports = runSeeds(seeds, { endless });
   for (const r of reports) {
     console.log(
-      `seed ${String(r.seed).padStart(3, '0')} [${r.mode}]: outcome=${r.outcome} act=${r.act} saved=${r.starsSaved} dark=${r.starsDark}` +
+      `seed ${String(r.seed).padStart(3, '0')} [${r.mode}]: outcome=${r.outcome} act=${r.act} cycle=${r.cycle} saved=${r.starsSaved} dark=${r.starsDark} stars=${r.stars}` +
       ` worldYears=${r.worldYears.toFixed(1)} actions=${r.actions} real=${r.hours.toFixed(2)}h` +
       ` events=${r.eventsSeen.unique}/${r.eventsSeen.resolved} techs=${r.techsBought} beetles=${r.launches}` +
       ` act2=${r.act2Actions ?? '-' } act3=${r.act3Actions ?? '-'}` +
