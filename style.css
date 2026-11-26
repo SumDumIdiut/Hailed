@@ -299,9 +299,11 @@ table.jt td.bad{color:var(--red)}
 .jclock .v{display:block;font-variant-numeric:tabular-nums;font:700 clamp(28px,5vw,48px)/1 var(--cond);color:var(--hi);}
 .jclock .v.jnum{min-width:120px;text-align:center;}
 .jclock:last-child .v{color:var(--acc);font-size:clamp(15px,1.4vw,19px);}
-.jstreaks{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
-.jstreaks i{position:absolute;width:min(30vw,140px);height:1px;background:var(--acc);
-  transform:translate(-50%,-50%) rotate(var(--a,0deg)) scale(var(--amp,0));opacity:0;transition:opacity .4s ease-out;}
+.jstreaks{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+/* each streak radiates from the screen centre: rotate first, then push outward along its own axis */
+.jstreaks i{position:absolute;left:50%;top:50%;width:min(40vw,520px);height:1px;transform-origin:0 50%;
+  background:linear-gradient(90deg,transparent,rgba(255,236,200,.75));
+  transform:rotate(var(--a,0deg)) translateX(calc(8vw + 30vw * var(--amp,0))) scaleX(var(--amp,0));opacity:0;transition:opacity .4s ease-out;}
 @media (prefers-reduced-motion: reduce){
   .jstreaks i{transition:none;}
 }
@@ -550,3 +552,4 @@ button:active:not(:disabled){transition-property:transform;}
 .board-item.done{animation:boardDone .7s ease-out}
 @keyframes boardDone{0%{background:var(--accbg);border-color:var(--acc)}100%{background:#090e15;border-color:#243246}}
 @media(max-width:1180px){.board-list{flex-wrap:wrap}.board-item{flex:1 1 170px}}
+#jump .jbox{z-index:1}

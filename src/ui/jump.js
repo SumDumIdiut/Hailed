@@ -110,7 +110,7 @@ export function createJump(api) {
     show('flight');
     if (starJump) {
       letterbox(true);
-      run.streaks = makeStreaks(fl);
+      run.streaks = makeStreaks(fl.parentElement || fl);
     }
     music.jumpStart(run.total, run.kind);
     cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
