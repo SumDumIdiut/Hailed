@@ -277,7 +277,10 @@ function startGame(s, sceneName) {
   ops.reset(); sysUI.resetNotes(); lab.reset(); blip.reset(); rockybar.reset(); mapView.select(null);
   eventCard.reset(); tech.reset(); board.clear();
   hud.show(true); hud.update(state); hud.renderLog(state);
-  setScene(sceneName || 'map');
+  // A prologue that still needs Adrian opens straight into its orbit view: the first action is SCAN, right there.
+  const c = s.campaign, step = c && c.prologue && !c.uiSkipPrologue && typeof sim.prologueStep === 'function' ? sim.prologueStep(s) : null;
+  if ((step === 'scan' || step === 'sample') && s.ship.planetId) { selectedPlanet = s.ship.planetId; setScene('planet'); }
+  else setScene(sceneName || 'map');
 }
 function newGame(sceneName, opts = {}) {
   const s = sim.createGame(1, opts);
@@ -288,7 +291,7 @@ function newGame(sceneName, opts = {}) {
   const prologue = !!(s.campaign && s.campaign.prologue);
   // Show the card the state asks for ourselves, then clear it so the frame loop does not replay it.
   const card = prologue
-    ? { kicker: 'ACT I', title: 'HAIL MARY', subtitle: 'Prologue' }
+    ? { kicker: 'ACT I · PROLOGUE', title: 'HAIL MARY', subtitle: 'Find the microbe that eats Astrophage. Save Earth and Erid.' }
     : (s.campaign && s.campaign.pendingCard) || { kicker: 'ACT II', title: 'THE SPREAD', subtitle: 'The stars are dimming. You are the last ship.' };
   if (s.campaign) s.campaign.pendingCard = null;
   actCard(card);   // not awaited: the tutorial starts underneath

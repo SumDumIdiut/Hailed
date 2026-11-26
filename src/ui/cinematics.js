@@ -26,7 +26,8 @@ style.textContent = `
   @media (prefers-reduced-motion: reduce){
     #act-card{transition:opacity 0s;}
   }
-  #act-card.out{opacity:1}
+  #act-card.show{opacity:1}
+  #act-card{background:radial-gradient(ellipse at center,rgba(0,0,0,.72),rgba(0,0,0,.9))}
   #act-card .kicker{
     color:var(--dim);font:700 11px var(--cond);letter-spacing:.3em;text-transform:uppercase;margin-bottom:8px;
   }
@@ -136,55 +137,38 @@ if (!card) {
 const actCardElement = card; // referenced above
 
 export function actCard({ kicker, title, subtitle, ms = 3600 }) {
-  if (REDUCED) {
-    const k = actCardElement.querySelector('.kicker'); k.textContent = kicker || '';
-    const t = actCardElement.querySelector('.title'); t.textContent = title || '';
-    const s = actCardElement.querySelector('.subtitle'); s.textContent = subtitle || '';
-    actCardElement.classList.add('out');
-    return Promise.resolve();
-  }
+  const el = actCardElement;
+  el.querySelector('.kicker').textContent = kicker || '';
+  el.querySelector('.title').textContent = title || '';
+  el.querySelector('.subtitle').textContent = subtitle || '';
+  clearTimeout(actCardTimer);
+  el.classList.remove('hidden', 'show');
+  const bars = el.querySelectorAll('.letter-bar');
+  const spans = el.querySelectorAll('.letter-track span');
+  bars.forEach((b) => b.classList.remove('visible'));
+  spans.forEach((sp) => sp.classList.remove('tracks-in'));
+  void el.offsetWidth;   // restart the transitions
+  el.classList.add('show');
+  bars.forEach((b) => b.classList.add('visible'));
+  spans.forEach((sp) => sp.classList.add('tracks-in'));
+  el.style.pointerEvents = 'auto';
   return new Promise((resolve) => {
-    // show card
-    actCardElement.classList.remove('out'); // reset
-    const k = actCardElement.querySelector('.kicker'); k.textContent = kicker || '';
-    const t = actCardElement.querySelector('.title'); t.textContent = title || '';
-    const s = actCardElement.querySelector('.subtitle'); s.textContent = subtitle || '';
-
-    // reset letter tracking spans
-    const tracks = actCardElement.querySelectorAll('.letter-track span');
-    tracks.forEach((span, i) => {
-      span.textContent = i === 0 ? title || '' : (subtitle || '').split('').slice(i-1).join('');
-      span.classList.remove('tracks-in');
-      // trigger reflow for transition
-      void span.offsetWidth;
-      span.classList.add('tracks-in');
-    });
-
-    // slide bars in
-    const topBar = actCardElement.querySelector('.letter-bar.top');
-    const bottomBar = actCardElement.querySelector('.letter-bar.bottom');
-    topBar.classList.remove('visible');
-    bottomBar.classList.remove('visible');
-    void topBar.offsetWidth;
-    void bottomBar.offsetWidth;
-    topBar.classList.add('visible');
-    bottomBar.classList.add('visible');
-
-    // click/escape to skip
-    const skip = actCardElement.querySelector('.skip');
+    let finished = false;
     const done = () => {
-      actCardElement.classList.add('out');
-      setTimeout(() => {
-        actCardElement.classList.add('hidden');
-        actCardElement.classList.remove('out');
-        resolve();
-      }, ms);
+      if (finished) return;
+      finished = true;
+      clearTimeout(actCardTimer);
+      document.removeEventListener('keydown', onKey, true);
+      el.removeEventListener('click', done);
+      el.classList.remove('show');
+      bars.forEach((b) => b.classList.remove('visible'));
+      el.style.pointerEvents = 'none';
+      setTimeout(() => { if (!el.classList.contains('show')) el.classList.add('hidden'); resolve(); }, REDUCED ? 0 : 400);
     };
-    skip.addEventListener('click', done);
-    document.addEventListener('keydown', (e) => { if(e.key === 'Escape') { done(); } }, { once: true });
-
-    // auto-resolve
-    actCardTimer = setTimeout(done, ms);
+    const onKey = (e) => { if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); done(); } };
+    el.addEventListener('click', done);
+    document.addEventListener('keydown', onKey, true);
+    actCardTimer = setTimeout(done, REDUCED ? Math.min(ms, 1500) : ms);
   });
 }
 
