@@ -2,7 +2,7 @@ import { starDistance, findStar, findPlanet } from './stars.js';
 import { tick } from './astrophage.js';
 import { addLog } from './util.js';
 import { drawEvent } from './events.js';
-import { revealAround } from './galaxy.js';
+import { revealAround, visitPoi } from './galaxy.js';
 import { effectMul } from './tech.js';
 
 const G_LY_YR2 = 1.0323;            // 1 g in ly/yr^2 (c = 1)
@@ -65,7 +65,7 @@ export function travel(state, starId) {
     for (const poi of state.pois || []) {
       if (!poi.pos) continue;
       const d = Math.hypot(to.pos[0] - poi.pos[0], to.pos[1] - poi.pos[1], to.pos[2] - poi.pos[2]);
-      if (d <= 2) poi.visited = true;
+      if (d <= 2) visitPoi(state, poi.id);
     }
     // Flight cards first; an arrival card is only drawn when nothing is already pending.
     const late = (state.campaign?.act ?? 1) >= 2;

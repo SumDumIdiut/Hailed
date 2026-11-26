@@ -57,7 +57,7 @@ export function harvest(state, mode = 'collector') {
   state.ship.fuelKg = Math.min(state.ship.fuelMaxKg, state.ship.fuelKg + plan.kg);
   const gained = Math.round(state.ship.fuelKg - before);
   state.research = (state.research ?? 0) + 2;
-  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.15 });
+  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.08 });
   if (plan.hullCost) state.ship.hull = Math.max(0.05, state.ship.hull - plan.hullCost);
   const text = mode === 'skim'
     ? `Skimmed the Petrova line at ${star.name}: +${gained} kg Astrophage in ${plan.days} days, hull -${Math.round(plan.hullCost * 100)}%.`

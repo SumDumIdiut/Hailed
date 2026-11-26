@@ -242,6 +242,43 @@ export function relayInRange(state, starId) {
   return !!target && relays.some((r) => starDistance(target, r) <= relayRadius(state));
 }
 
+// Visiting a Cartographer buoy in chain order decodes one more fragment. The event
+// cards can still tell the story in flight, but the chain is never gated on a draw.
+export function visitPoi(state, poiId) {
+  const poi = (state.pois || []).find((p) => p.id === poiId);
+  if (!poi || !poi.pos) return null;
+  poi.visited = true;
+  const c = state.campaign;
+  if (c?.mode === 'campaign' && c.act === 3 && Array.isArray(c.buoyChain)
+      && poi.kind === 'buoy') {
+    const visited = new Set((state.pois || []).filter((p) => p.visited).map((p) => p.id));
+    const flags = ensureEventsFlags(state);
+    // Decode every fragment whose buoy has now been visited. A buoy reached early
+    // (or by an event-drawn visit) must not block the ones behind it.
+    let step = c.buoyStep ?? 0;
+    while (step < c.buoyChain.length && visited.has(c.buoyChain[step])) {
+      const flag = `carto${step + 1}`;
+      if (!flags[flag]) {
+        flags[flag] = true;
+        addLog(state, `A Cartographer buoy yields fragment ${step + 1}.`);
+      }
+      step++;
+    }
+    c.buoyStep = step;
+    if (step >= c.buoyChain.length && !flags.carto6) {
+      flags.carto6 = true;
+      addLog(state, 'The last buoy opens: the Cartographer map is complete.');
+    }
+  }
+  return poi;
+}
+
+function ensureEventsFlags(state) {
+  if (!state.events || typeof state.events !== 'object') state.events = {};
+  if (!state.events.flags || typeof state.events.flags !== 'object') state.events.flags = {};
+  return state.events.flags;
+}
+
 export function buildRelay(state, starId) {
   if (!state.galaxy) initKnowledge(state);
   if (!findStar(state, starId) || state.galaxy.relays.includes(starId)) return false;

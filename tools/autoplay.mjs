@@ -21,7 +21,8 @@ export const STUCK_THRESHOLD = 50;   // same state signature this many times in 
 const LOW_FUEL_KG = 20000;           // refuel once the tanks run this low
 const SOURCE_PROFILE = Object.fromEntries(S.BIOSPHERE.map((t) => [t, 0.95]));  // the Source wants a full-coverage strain
 const BEETLE_DISTANCE_LY = 0.1;     // send couriers instead of flying whenever there is a gap
-const MIN_BREEDS_PER_SAVE = 10;     // a world needs a real breeding campaign, not one lucky strain
+const MIN_BREEDS_PER_SAVE = 32;     // a world needs a real breeding campaign, not one lucky strain
+const SOURCE_SAVES_REQUIRED = 22;   // work the lanes before attempting the final answer
 
 const starOf = (g, id) => (g.stars || []).find((s) => s.id === id) || null;
 const planetOf = (g, id) => {
@@ -36,8 +37,10 @@ const planetOf = (g, id) => {
 function signature(g) {
   const s = g.ship || {}, c = g.campaign || {};
   const threats = (c.targets || []).filter((id) => { const st = starOf(g, id); return st && !st.saved; }).join(',');
+  // World time is deliberately absent: an idle loop advances it by 0.25 every pass,
+  // which would keep the signature changing forever and defeat stuck detection.
   return JSON.stringify([
-    g.status, c.act, c.mode, +(g.time?.worldYears ?? 0).toFixed(3),
+    g.status, c.act, c.mode,
     s.starId, s.planetId, Math.round(s.fuelKg ?? 0), Math.round((s.hull ?? 1) * 100),
     !!g.delivered?.sol, !!g.delivered?.eri40,
     (c.saved || []).length, (c.dark || []).length,
@@ -166,6 +169,26 @@ function refuel(g, st) {
   return !!S.harvest(g, 'skim')?.ok;
 }
 
+// A saved star's Astrophage is hunted to zero, so the Petrova collector has nothing
+// to skim. Rocky's gather run at the Petrova world still brings back a drum of fuel.
+function rockyFuelRun(g, st) {
+  if ((g.ship.fuelKg ?? 0) >= LOW_FUEL_KG) return false;
+  if (!g.rocky?.docked || g.rocky.mission) return S.waitForRocky(g).ok;
+  const star = starOf(g, g.ship.starId);
+  const tgt = star ? S.petrovaTarget(star.planets) : null;
+  if (!tgt || !(S.missionPlan(g, 'gather', tgt.id).yield?.astrophageKg > 0)) return false;
+  if ((g.ship.planetId ?? null) !== tgt.id) {
+    if (!S.travelToPlanet(g, tgt.id).ok) return false;
+    st.actions += 1;
+    return true;
+  }
+  st.actions += 1; st.harvests += 1;
+  S.startMission(g, 'gather', tgt.id);
+  st.actions += 1;
+  S.waitForRocky(g);
+  return true;
+}
+
 // Jump to a system, stopping to refuel first if the tank cannot cover the trip.
 function travelTo(g, st, id) {
   const plan = S.travelPlan(g, id);
@@ -216,12 +239,17 @@ function surveyTarget(g, st, id) {
 // Advance the working strain one generation toward the profile's weakest-covered trait.
 // The work record keeps the same culture across steps, so a save takes several breeds.
 function breedToward(g, st, key, profile) {
+  const strains = S.geneticsOf(g).strains || [];
   let work = st.work && st.work.key === key ? st.work : null;
-  let strain = work && S.geneticsOf(g).strains.find((s) => s.id === work.strainId);
+  let strain = work && strains.find((s) => s.id === work.strainId);
   if (!strain) {
-    strain = S.newStrain(g);
+    // Start each new culture from the best existing one (or from the best survivor
+    // if the previous culture was culled). A fresh 5%-trait strain every time made
+    // the bot breed hundreds of pointless generations per act.
+    const parent = strains.slice().sort((a, b) => S.coverage(b, profile) - S.coverage(a, profile))[0] || null;
+    strain = S.newStrain(g, parent);
     strain.population = 200;
-    work = { key, strainId: strain.id, gens: 0 };
+    work = { key, strainId: strain.id, gens: work?.gens ?? 0 };
     st.work = work;
   }
   const short = S.BIOSPHERE.filter((t) => (profile[t] ?? 0) > 0)
@@ -263,7 +291,7 @@ function deliverThreat(g, st) {
   // the bot has spent a good while working the lanes.
   const sourceRun = (c.act ?? 1) === 3 && !!c.sourceStarId && !c.sourceDelivered
     && !!g.events?.flags?.carto6
-    && (st.act3Start != null ? st.actions - st.act3Start >= 820 : false);
+    && ((c.saved || []).length - (st.act3SavedAtStart ?? 0)) >= SOURCE_SAVES_REQUIRED;
   if (sourceRun) {
     const sourceId = c.sourceStarId;
     const profile = SOURCE_PROFILE;
@@ -291,7 +319,8 @@ function deliverThreat(g, st) {
   if (st.work && st.work.key !== 'source') {
     const w = starOf(g, st.work.key);
     const inFlight = (g.beetles || []).some((b) => b.to === w?.id && b.status === 'flying');
-    if (w && !w.saved && !w.dark && !inFlight && st.work.gens < 30) threat = { id: w.id, star: w };
+    // Do not grind one stubborn world forever: a short culture, then move on.
+    if (w && !w.saved && !w.dark && !inFlight && st.work.gens < MIN_BREEDS_PER_SAVE + 6) threat = { id: w.id, star: w };
   }
   // Claim the target before surveying it: travel to a system must not be abandoned
   // halfway just because another star's infection ticked higher.
@@ -322,6 +351,26 @@ function deliverThreat(g, st) {
     return true;
   }
   return breedToward(g, st, threat.id, profile);
+}
+
+// Visit the Cartographer buoys in chain order. Each visit decodes one fragment, so
+// the Source is reachable without waiting for six lucky event draws.
+function buoyHunt(g, st) {
+  const c = g.campaign || {};
+  if (c.act !== 3 || c.mode === 'endless' || g.events?.flags?.carto6) return false;
+  const nextId = (c.buoyChain || [])[c.buoyStep ?? 0];
+  if (!nextId) return false;
+  const poi = (g.pois || []).find((p) => p.id === nextId);
+  if (!poi?.pos) return false;
+  let best = null, bd = Infinity;
+  for (const s of g.stars || []) {
+    const d = Math.hypot(s.pos[0] - poi.pos[0], s.pos[1] - poi.pos[1], s.pos[2] - poi.pos[2]);
+    if (d < bd) { bd = d; best = s; }
+  }
+  if (!best) return false;
+  if (g.ship.starId !== best.id) return travelTo(g, st, best.id);
+  if (!poi.visited && bd <= 2) { S.visitPoi(g, nextId); return true; }
+  return false;
 }
 
 // Keep the Cartographer chain moving: flight, arrival and survey draws are the only
@@ -373,7 +422,7 @@ function galacticSurvey(g, st) {
     if (!p) {
       // One confirmation scan per known world: fresh data, once, not an endless loop.
       const passes = st.reswept?.get(id) ?? 0;
-      if (passes < 2 && S.scanPlanet(g, s.planets[0].id).ok) {
+      if (passes < 1 && S.scanPlanet(g, s.planets[0].id).ok) {
         if (!st.reswept) st.reswept = new Map();
         st.reswept.set(id, passes + 1);
         st.actions += 1; st.scans += 1; return true;
@@ -489,6 +538,15 @@ function step(g, st) {
       if (sk?.ok) return true;
       st.actions -= 1;
     }
+    if (rockyFuelRun(g, st)) return true;
+    // This system has no Petrova world: hop to one while there is still fuel to jump.
+    const here = starOf(g, g.ship.starId);
+    if (here?.pos) {
+      const fuelStar = (g.stars || []).filter((s) => s.id !== here.id && S.petrovaTarget(s.planets))
+        .sort((a, b) => Math.hypot(a.pos[0] - here.pos[0], a.pos[1] - here.pos[1], a.pos[2] - here.pos[2])
+          - Math.hypot(b.pos[0] - here.pos[0], b.pos[1] - here.pos[1], b.pos[2] - here.pos[2]))[0];
+      if (fuelStar && travelTo(g, st, fuelStar.id)) return true;
+    }
   }
 
   // spend research as it arrives, so the lab and probe techs speed up the later acts
@@ -498,14 +556,7 @@ function step(g, st) {
   if (act >= 2 && doContract(g, st)) return true;
   if (galacticSurvey(g, st)) return true;
 
-  // The Cartographer chain only draws on flights, arrivals and surveys, so keep jumping.
-  if (act === 3 && !g.events?.flags?.carto6 && st.actions % 8 === 0) {
-    const here = starOf(g, g.ship.starId);
-    const near = (g.stars || []).filter((s) => s.id !== g.ship.starId && s.pos && here)
-      .sort((a, b) => Math.hypot(a.pos[0] - here.pos[0], a.pos[1] - here.pos[1], a.pos[2] - here.pos[2])
-        - Math.hypot(b.pos[0] - here.pos[0], b.pos[1] - here.pos[1], b.pos[2] - here.pos[2]));
-    if (near[0] && travelTo(g, st, near[0].id)) return true;
-  }
+  if (buoyHunt(g, st)) return true;
 
   if (deliverThreat(g, st)) return true;
 
@@ -519,7 +570,7 @@ export function playSeed(seed, opts = {}) {
   const maxActions = opts.maxActions ?? DEFAULT_MAX_ACTIONS;
   const maxWorldYears = opts.maxWorldYears ?? DEFAULT_MAX_WORLD_YEARS;
   const g = endless ? S.startEndless(seed) : S.createGame(seed);
-  const st = { actions: 0, scans: 0, samples: 0, breeds: 0, delivers: 0, launches: 0, buys: 0, events: 0, harvests: 0, crafts: 0, jumps: 0, tech: [], beetles: [], blocked: '', work: null };
+  const st = { actions: 0, scans: 0, samples: 0, breeds: 0, delivers: 0, launches: 0, buys: 0, events: 0, harvests: 0, crafts: 0, jumps: 0, idle: 0, tech: [], beetles: [], blocked: '', work: null };
   const sigs = [];
   const actEntered = { 2: null, 3: null };
   let stuck = false, stuckReason = '';
@@ -527,20 +578,34 @@ export function playSeed(seed, opts = {}) {
   while (g.status === 'playing' && st.actions < maxActions && (g.time?.worldYears ?? 0) < maxWorldYears) {
     const act = g.campaign?.act ?? 1;
     if (actEntered[act] === null && act >= 2) {
-      actEntered[act] = { actions: st.actions, years: g.time.worldYears };
-      if (act === 3) st.act3Start = st.actions;
+      actEntered[act] = { actions: st.actions, years: g.time.worldYears, counts: { ...st } };
+      if (act === 3) {
+        st.act3Start = st.actions;
+        st.act3SavedAtStart = (g.campaign.saved || []).length;
+      }
     }
+    // Waiting on a courier is progress, not a loop: its arrival timer is world time.
+    const awaitingCourier = (g.beetles || []).some((b) => b.status === 'flying' && b.arriveWorldYears > g.time.worldYears);
     const sig = signature(g);
-    sigs.push(sig);
-    if (sigs.length > STUCK_THRESHOLD) sigs.shift();
-    if (sigs.length >= STUCK_THRESHOLD && sigs.every((s) => s === sig)) {
-      stuck = true;
-      stuckReason = st.blocked || 'the same state signature repeated without progress';
-      break;
+    if (!awaitingCourier) {
+      sigs.push(sig);
+      if (sigs.length > STUCK_THRESHOLD) sigs.shift();
+      if (sigs.length >= STUCK_THRESHOLD && sigs.every((s) => s === sig)) {
+        stuck = true;
+        stuckReason = st.blocked || 'the same state signature repeated without progress';
+        break;
+      }
     }
     const acted = step(g, st);
+    if (acted || awaitingCourier) st.idle = 0;
+    else {
+      // Nothing left to do: time still passes, but never let an idle loop burn
+      // centuries (the old Act III soft-lock) or hide a dead end from the guard above.
+      st.idle += 1;
+      if (st.idle >= 4) { stuck = true; stuckReason = 'no legal action for four consecutive ticks'; break; }
+    }
     // Long acts are punctuated by shipboard incidents: a fresh draw on each action.
-    if (acted && (g.campaign?.act ?? 1) >= 2 && !g.events?.pending) S.drawEvent(g, 'random', { chance: 0.32 });
+    if (acted && (g.campaign?.act ?? 1) >= 2 && !g.events?.pending) S.drawEvent(g, 'random', { chance: 0.06 });
     // Game actions use the astrophage tick internally; the composite tick still has to
     // run for the mission board, beetle arrivals and act transitions.
     S.tick(g, acted ? 0 : 0.25);
@@ -561,11 +626,13 @@ export function playSeed(seed, opts = {}) {
     act3Actions: actEntered[3] ? st.actions - actEntered[3].actions : null,
     act2Years: actEntered[3] ? actEntered[3].years - (actEntered[2]?.years ?? 0) : null,
     act3Years: actEntered[3] ? g.time.worldYears - actEntered[3].years : null,
+    act3Stats: actEntered[3] ? Object.fromEntries(['breeds', 'events', 'harvests', 'jumps', 'launches', 'scans']
+      .map((k) => [k, st[k] - (actEntered[3].counts[k] ?? 0)])) : null,
     delivers: st.delivers, launches: st.launches, buys: st.buys, events: st.events,
     eventsSeen: { unique: uniqueEvents.size, resolved: st.events },
     techsBought: st.tech.length, beetlesLaunched: st.launches, beetles: [...(g.beetles || [])].map((b) => b.id),
     techs: [...st.tech],
-    stuck, stuckReason,
+    stuck, stuckReason, blocked: st.blocked, work: st.work, idle: st.idle, jumps: st.jumps, harvests: st.harvests,
     realSeconds, hours: realSeconds / 3600,
     state: g,
   };

@@ -93,6 +93,43 @@ test('eight saves advance to act III and mark the Source buoy', () => {
   assert.ok(g.stars.some((s) => s.id === g.campaign.sourceStarId));
 });
 
+test('act III: visiting the buoy chain grants the Cartographer flags without event draws', () => {
+  const g = toAct2(S.createGame(21));
+  g.campaign.saved = g.campaign.targets.slice(0, 8);
+  S.tick(g, 0.25);
+  assert.equal(g.campaign.act, 3);
+  assert.equal(g.events.flags.carto6, undefined, 'no card was drawn');
+  const chain = g.campaign.buoyChain;
+  assert.equal(chain.length, 5);
+  for (const id of chain) S.visitPoi(g, id);
+  for (let i = 1; i <= 6; i++) assert.equal(g.events.flags[`carto${i}`], true, `carto${i}`);
+  // Visits arriving out of order still decode the whole chain.
+  const h = toAct2(S.createGame(21));
+  h.campaign.saved = h.campaign.targets.slice(0, 8);
+  S.tick(h, 0.25);
+  for (const id of [...h.campaign.buoyChain].reverse()) S.visitPoi(h, id);
+  assert.equal(h.events.flags.carto6, true);
+});
+
+test('act III: ten dark lane worlds, or twelve centuries, end the run', () => {
+  const g = toAct2(S.createGame(22));
+  g.campaign.saved = g.campaign.targets.slice(0, 8);
+  S.tick(g, 0.25);
+  assert.equal(g.campaign.act, 3);
+  for (const id of g.campaign.extraTargets.slice(0, 10)) star(g, id).infection = 0.95;
+  S.tick(g, 0.25);
+  assert.equal(g.status, 'lost');
+  assert.match(g.statusText, /Lanes/);
+
+  const h = toAct2(S.createGame(22));
+  h.campaign.saved = h.campaign.targets.slice(0, 8);
+  S.tick(h, 0.25);
+  h.time.worldYears = 1201;
+  S.tick(h, 0.25);
+  assert.equal(h.status, 'lost');
+  assert.match(h.statusText, /centuries/);
+});
+
 test('act II: six dark target stars lose; sol going dark loses too', () => {
   const g = toAct2(S.createGame(5));
   for (const id of g.campaign.targets.slice(0, 6)) star(g, id).infection = 0.95;
@@ -167,6 +204,20 @@ test('beetle arrivals are credited to the campaign', () => {
   S.tick(g, 0.25);
   assert.ok(g.campaign.saved.includes(target));
   assert.equal(star(g, target).saved, true);
+});
+
+test('beetle delivery uses its launched strain snapshot even after the lab culls the culture', () => {
+  const g = toAct2(S.createGame(23));
+  g.rocky.materials = { minerals: 10, volatiles: 10, gas: 10, silicates: 10 };
+  const s = perfect(g);
+  const target = g.campaign.targets[0];
+  const r = S.launchBeetle(g, s.id, target);
+  assert.equal(r.ok, true, r.why);
+  for (let i = 0; i < 10; i++) S.newStrain(g);
+  assert.ok(!g.genetics.strains.some((x) => x.id === s.id), 'the lab culled the launched culture');
+  g.time.worldYears = r.beetle.arriveWorldYears;
+  S.tick(g, 0.25);
+  assert.ok(g.campaign.saved.includes(target));
 });
 
 test('final win needs carto6 and a source-grade strain delivered at the Source', () => {

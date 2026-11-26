@@ -117,7 +117,9 @@ export function breed(state, { focus, pressure, strainId } = {}, tickFn = tick) 
   state.lab.escapeRisk = state.ship.upgrades.includes('xenonite-lab') ? 0 : +(0.6 * Math.max(...BIOSPHERE.map((t) => strain.traits?.[t] ?? 0)) ** 2).toFixed(4);
   state.research = (state.research ?? 0) + 2;
   spendTime(state, COSTS.breed.years, tickFn);
-  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.5 });
+  // A long breeding campaign must not resolve a card every other generation: with the
+  // expanded deck that made events (and their world-time costs) dominate the acts.
+  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.12 });
   const text = `Breeding generation ${strain.gen} from ${parent.id} for ${focusT} at ${(p * 100).toFixed(0)}% pressure. Strongest trait ${+(BIOSPHERE.map((t) => strain.traits?.[t] ?? 0).reduce((a, b) => Math.max(a, b), 0)).toFixed(3)}.`;
   addLog(state, text);
   return { ok: true, text, strain, parent, escapeRisk: state.lab.escapeRisk, cost: { years: COSTS.breed.years, fuelKg: COSTS.breed.fuelKg } };

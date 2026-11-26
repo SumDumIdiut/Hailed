@@ -44,6 +44,9 @@ export function launchBeetle(state, strainId, toStarId) {
   const beetle = {
     id: `b${(state.beetles?.length || 0) + 1}`,
     strainId, from: from ? from.id : state.ship.starId, to: toStarId,
+    // A probe carries its own sample of the culture. Looking the strain up in the
+    // lab again on arrival meant a culled generation could never complete a delivery.
+    strainData: { id: strain.id, name: strain.name, traits: { ...strain.traits }, population: strain.population ?? 200 },
     departWorldYears: +state.time.worldYears.toFixed(4), arriveWorldYears: +(state.time.worldYears + d / speed).toFixed(4),
     status: 'flying',
   };
@@ -52,7 +55,7 @@ export function launchBeetle(state, strainId, toStarId) {
   state.ship.fuelKg -= fuelCost;
   if (have) { have.minerals -= need.minerals; have.silicates -= need.silicates; }
   addLog(state, `Beetle probe ${beetle.id} launched to ${to.name} with strain ${strainId}.`);
-  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.4 });
+  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.15 });
   return { ok: true, why: '', beetle, distanceLy: d, travelYears: d / speed };
 }
 
@@ -66,7 +69,7 @@ export function beetleTick(state) {
     if (state.time.worldYears < b.arriveWorldYears) continue;
     b.status = 'arrived';
     const star = findStar(state, b.to);
-    const strain = (g.strains || []).find((s) => s.id === b.strainId);
+    const strain = b.strainData || (g.strains || []).find((s) => s.id === b.strainId);
     const profile = star ? biosphereProfile(star) : null;
     const cov = strain && profile ? coverage(strain, profile) : 0;
     const ok = canSave(strain, profile);

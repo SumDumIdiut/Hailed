@@ -28,6 +28,7 @@ export function ensureCampaign(state) {
   if (c.pendingCard === undefined) c.pendingCard = null;
   if (c.targets === undefined) c.targets = [];
   if (!Array.isArray(c.extraTargets)) c.extraTargets = [];
+  if (!Array.isArray(c.act3Dark)) c.act3Dark = [];
   return c;
 }
 
@@ -73,6 +74,14 @@ function seedAct3(state, c) {
     if (d > far) { far = d; source = p; }
   }
   c.poiChain = pois.map((p) => p.id);
+  // The buoy chain is a deterministic way to finish the Cartographer story: visiting
+  // these five buoys in order grants carto1..carto5, then carto6, without relying on
+  // the event deck ever drawing all six cards.
+  c.buoyChain = buoys.map((p) => p.id);
+  c.buoyStep = 0;
+  // Act III opens a fresh wave of lane detections. Without new work the bot can save
+  // every known world before the Source, then sit idle with nothing reachable.
+  for (let i = 0; i < 10; i++) seedNextStar(state, c);
   if (source) {
     source.source = true;
     c.sourcePoiId = source.id;
@@ -83,11 +92,11 @@ function seedAct3(state, c) {
 
 // Later acts keep revealing new infections along the lanes. These worlds are not part of
 // the six-target loss rule; they are the work that makes the acts long.
-const EXTRA_INTERVAL = { 2: 14, 3: 16 };
+const EXTRA_INTERVAL = { 2: 14, 3: 8 };
 function seedNextStar(state, c) {
   const act = c.act >= 3 ? 3 : 2;
   const n = (c.extraTargets || []).length;
-  if (n >= 18) return false;   // a bounded wave, not an endless avalanche
+  if (n >= 30) return false;   // a bounded wave, not an endless avalanche
   const rng = createRng(mixSeed(state.seed ?? 1, hashStr(`lane-detection-${n}`)));
   const skip = new Set(['sol', 'eri40', 'tauceti', ...(c.targets || []), ...(c.extraTargets || [])]);
   const pool = (state.stars || []).filter((s) => !skip.has(s.id) && !s.saved && !s.dark && (s.infection ?? 0) < 0.03);
@@ -322,7 +331,7 @@ export function campaignTick(state) {
     if (b.status !== 'arrived' || b.credited) continue;
     b.credited = true;
     const star = findStar(state, b.to);
-    const strain = geneticsOf(state).strains.find((s) => s.id === b.strainId);
+    const strain = b.strainData || geneticsOf(state).strains.find((s) => s.id === b.strainId);
     if (star && star.saved) creditSave(state, star, strain, `Beetle ${b.id}`, 0);
     // A courier can answer the Source too: the final check needs the strain, not the ship.
     if (c.mode === 'campaign' && c.act === 3 && b.to === c.sourceStarId && !c.sourceDelivered
@@ -345,8 +354,15 @@ export function campaignTick(state) {
     if (s.lum < DARK_LUM * s.lum0 || (s.infection ?? 0) >= 0.9) {
       s.dark = true;
       c.dark.push(s.id);
+      if (c.mode === 'campaign' && c.act >= 3 && !c.act3Dark.includes(s.id)) c.act3Dark.push(s.id);
       addLog(state, `${s.name} has gone dark. The Astrophage has taken another world.`);
     }
+  }
+  // Act III has an ending of its own: ten lane worlds lost, or twelve centuries of
+  // drifting without an answer. Neither the Source nor the bot can soft-lock the act.
+  if (c.mode === 'campaign' && c.act >= 3) {
+    if (c.act3Dark.length >= 10) lose(state, 'Ten stars along the Lanes have gone dark. The campaign is lost.');
+    else if (state.time.worldYears >= 1200) lose(state, 'Twelve centuries pass. The lanes fall silent with the Source unanswered.');
   }
   const sol = findStar(state, 'sol'), erid = findStar(state, 'eri40');
   if (c.mode === 'endless') {
