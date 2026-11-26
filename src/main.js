@@ -19,6 +19,9 @@ import { sfx, music, bus as audioBus } from './audio/index.js';
 import { actCard, fadeTo, deliveryCard } from './ui/cinematics.js';
 
 const SAVE_KEY = 'hailed-save';
+const ENDLESS_KEY = 'hailed-save-endless';   // endless runs keep their own slot so they never overwrite the campaign
+const keyFor = (s) => (s && s.campaign && s.campaign.mode === 'endless' ? ENDLESS_KEY : SAVE_KEY);
+let paused = false;
 const IDLE_DRIFT = 0.02;          // world years per real second in the system scene; 0 disables
 // Camera distances are renderer world units. System dist is seeded from renderer.fitDist(star) on
 // entering each system (ZOOM_START of the full fit so planets are not tiny). Closeup dist is in
@@ -72,8 +75,8 @@ function toast(text, bad) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
   sfx.play(bad ? 'warn' : 'toast');
 }
-function save() { try { localStorage.setItem(SAVE_KEY, sim.serialize(state)); } catch (_) {} }
-function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (_) { return false; } }
+function save() { if (!state) return; try { localStorage.setItem(keyFor(state), sim.serialize(state)); } catch (_) {} }
+function hasSave(key = SAVE_KEY) { try { return !!localStorage.getItem(key); } catch (_) { return false; } }
 function afterAction(text, bad) {
   if (text) toast(text, bad);
   save(); hud.update(state); hud.renderLog(state); objective.update(state); checkEnd(); tutorial.update();
@@ -249,13 +252,18 @@ document.querySelectorAll('#tabs [data-scene]').forEach((b) => b.addEventListene
 $('btn-save').addEventListener('click', () => { save(); toast('Game saved.'); });
 window.addEventListener('keydown', (e) => {
   if (!state) return;
+  if (paused) { if (e.key === 'Escape') { e.preventDefault(); setPaused(false); } return; }
   if (jump.key(e)) { e.preventDefault(); return; }
   if (e.target.tagName === 'INPUT') return;
   if (scene === 'planet' && ops.key(e, true)) { e.preventDefault(); return; }
   if (jump.active) return;
   const m = { 1: 'map', 2: 'system', 3: 'lab', 4: 'blip', 5: 'tech' }[e.key];
   if (m) setScene(m);
-  else if (e.key === 'Escape') { if (scene === 'planet') setScene('system'); else if (scene === 'system' && selectedPlanet) { selectedPlanet = null; sysUI.renderSystem(); } }
+  else if (e.key === 'Escape') {
+    if (scene === 'planet') setScene('system');
+    else if (scene === 'system' && selectedPlanet) { selectedPlanet = null; sysUI.renderSystem(); }
+    else setPaused(true);
+  }
 });
 
 window.addEventListener('keyup', (e) => { if (state && scene === 'planet') ops.key(e, false); });
@@ -301,12 +309,42 @@ $('btn-new').addEventListener('click', () => newGame('map'));
 $('btn-continue').addEventListener('click', continueGame);
 $('btn-endless').addEventListener('click', () => {
   tutorial.suppress();   // endless starts straight into the front, no tutorial
+  if (hasSave(ENDLESS_KEY)) {
+    try { startGame(sim.deserialize(localStorage.getItem(ENDLESS_KEY)), 'map'); return; }
+    catch (e) { console.error(e); }
+  }
   const s = sim.startEndless(Date.now() & 0xffff);
   if (s.campaign && s.campaign.pendingCard) s.campaign.pendingCard = null;   // our own card below
   startGame(s, 'map'); save();
   actCard({ kicker: 'ENDLESS', title: 'PETROVA FRONT', subtitle: 'Hold the line as long as you can.' });
 });
 $('btn-quit').addEventListener('click', quit);
+
+// ---- pause menu --------------------------------------------------------
+function setPaused(on) {
+  paused = !!on && !!state;
+  $('pause').classList.toggle('hidden', !paused);
+}
+function toTitle() {
+  save(); setPaused(false);
+  state = null; scene = 'title'; prevScene = 'title'; selectedPlanet = null;
+  for (const id of PANELS) $(id).classList.add('hidden');
+  hud.show(false); $('map').classList.remove('on'); $('gl').style.visibility = 'visible';
+  $('hint').classList.add('hidden'); $('tooltip').classList.add('hidden'); $('modal').classList.add('hidden');
+  ops.setVisible(false); sysUI.hideLabels(); rockybar.reset(); eventCard.reset(); board.clear();
+  const rb = document.getElementById('rockybar'); if (rb) rb.classList.add('hidden');
+  tutorial.suppress && tutorial.suppress();
+  $('btn-continue').disabled = !hasSave();
+  refreshEndlessLabel();
+  $('title').classList.remove('hidden');
+}
+$('btn-menu').addEventListener('click', () => setPaused(true));
+$('p-resume').addEventListener('click', () => setPaused(false));
+$('p-save').addEventListener('click', () => { save(); toast('Game saved.'); });
+$('p-title').addEventListener('click', toTitle);
+$('p-quit').addEventListener('click', () => { save(); quit(); });
+function refreshEndlessLabel() { $('btn-endless').textContent = hasSave(ENDLESS_KEY) ? 'Endless: continue' : 'Endless'; }
+refreshEndlessLabel();
 $('btn-tut').addEventListener('click', () => {
   tutorial.replay();
   const b = $('btn-tut'); b.textContent = 'Tutorial reset: on'; setTimeout(() => { b.textContent = 'Replay tutorial'; }, 2500);
@@ -376,7 +414,7 @@ function frame(now) {
   if (!state) { if (renderer) { P.b('backdrop'); drawBackdrop((now - t0) / 1000); P.e('backdrop'); P.finish && P.finish(); } return; }
   const t = (now - t0) / 1000;
   P.b('sim');
-  if (IDLE_DRIFT > 0 && scene === 'system' && state.status === 'playing' && !jump.active) {
+  if (IDLE_DRIFT > 0 && !paused && scene === 'system' && state.status === 'playing' && !jump.active) {
     sim.tick(state, dt * IDLE_DRIFT);
   }
   P.e('sim'); P.b('ops');

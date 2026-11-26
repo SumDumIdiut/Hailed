@@ -39,7 +39,7 @@ style.textContent = `
     letter-spacing:.06em;max-width:60ch;text-align:center;
   }
   #act-card .letter-track{
-    position:relative;color:inherit;white-space:nowrap;
+    position:relative;color:inherit;display:flex;flex-direction:column;align-items:center;gap:14px;
   }
   #act-card .letter-track span{
     display:inline-block;transform:translateY(12px);opacity:0;

@@ -46,6 +46,7 @@
         <button data-scene="blip" title="Blip-A (4)"><i class="lamp"></i><span>Blip-A</span><b>4</b></button>
         <button data-scene="tech" title="Tech tree (5)"><i class="lamp"></i><span>Tech</span><b>5</b></button>
         <button id="btn-save" class="ghost" title="Save now"><span>Save</span></button>
+        <button id="btn-menu" class="ghost" title="Menu (Esc)"><span>Menu</span></button>
       </nav>
       <div id="objective" class="hidden"><span class="k">Directive <b id="obj-stage"></b></span><span class="goal" id="obj-goal"></span><span class="act" id="obj-act"></span></div>
     </div>
@@ -118,6 +119,16 @@
   </div>
 </div>
 
+<div id="pause" class="screen hidden"><div class="modal-inner pause-inner">
+  <h2>PAUSED</h2>
+  <div class="pbtns">
+    <button id="p-resume" class="primary">Resume</button>
+    <button id="p-save">Save</button>
+    <button id="p-title">Save &amp; main menu</button>
+    <button id="p-quit" class="ghost">Save &amp; quit</button>
+  </div>
+  <p class="pnote">Esc to resume</p>
+</div></div>
 <div id="modal" class="screen hidden"><div class="modal-inner"><h2 id="m-title"></h2><p id="m-text"></p><button id="m-btn" class="primary">New game</button></div></div>
 <div id="nogl" class="hidden">WebGL2 is unavailable. System and planet views are disabled; map, lab and Blip-A still work.</div>
 
