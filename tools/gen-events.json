@@ -1,0 +1,2666 @@
+[
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Core Overload",
+  "text": "The reactor is overheating. Rocky checks the coolant lines. Can you divert power?",
+  "choices": [
+   {
+    "label": "Divert power",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research, risk hull"
+   },
+   {
+    "label": "Reinforce hull",
+    "effects": [
+     {
+      "hull": 0.08
+     },
+     {
+      "samples": -2
+     }
+    ],
+    "hint": "Gain hull, lose samples"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Dancing Stars",
+  "text": "The stars orbit in perfect synchrony. Something is pulling them. Rocky asks, 'engineer question?'",
+  "choices": [
+   {
+    "label": "Investigate Orbit",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research but risk hull damage"
+   },
+   {
+    "label": "Scan for Source",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -1200
+     }
+    ],
+    "hint": "Gain samples but spend fuel"
+   },
+   {
+    "label": "Ignore and Move",
+    "effects": [
+     {
+      "fuel": 800
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but miss opportunity"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Flickering Beacon",
+  "text": "A pulsar blinks in irregular rhythm. Rocky says, 'strange question?'",
+  "choices": [
+   {
+    "label": "Map the Pulse",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "chance": 0.6,
+      "then": [
+       {
+        "hull": 0.02
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.03
+       }
+      ]
+     }
+    ],
+    "hint": "Gain research but risk system instability"
+   },
+   {
+    "label": "Try to Communicate",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": 1
+     },
+     {
+      "chance": 0.5,
+      "then": [
+       {
+        "hull": 0.01
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.04
+       }
+      ]
+     }
+    ],
+    "hint": "Gain material but risk system overload"
+   },
+   {
+    "label": "Leave Beacon",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "research": -2
+     }
+    ],
+    "hint": "Save time but lose potential insight"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Shifting Planets",
+  "text": "Planets shift positions in real-time. Rocky asks, 'system question?'",
+  "choices": [
+   {
+    "label": "Track Movement",
+    "effects": [
+     {
+      "research": 7
+     },
+     {
+      "fuel": -1500
+     }
+    ],
+    "hint": "Gain research but risk fuel"
+   },
+   {
+    "label": "Attempt to Stabilize",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": 2
+     },
+     {
+      "hull": -0.06
+     }
+    ],
+    "hint": "Gain material but risk hull"
+   },
+   {
+    "label": "Ignore and Proceed",
+    "effects": [
+     {
+      "fuel": 1000
+     },
+     {
+      "research": -4
+     }
+    ],
+    "hint": "Save fuel but miss data"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Twin Suns",
+  "text": "Two stars orbit each other in perfect harmony. Rocky says, 'solar question?'",
+  "choices": [
+   {
+    "label": "Study Light Patterns",
+    "effects": [
+     {
+      "research": 8
+     },
+     {
+      "years": 0.2
+     }
+    ],
+    "hint": "Gain research but risk time"
+   },
+   {
+    "label": "Collect Solar Samples",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "fuel": -1800
+     }
+    ],
+    "hint": "Gain samples but spend fuel"
+   },
+   {
+    "label": "Avoid the Sun",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "samples": -2
+     }
+    ],
+    "hint": "Save time but lose samples"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Gravity Anomaly",
+  "text": "The ship's instruments detect a gravity well without a nearby mass. Rocky asks, 'gravity question?'",
+  "choices": [
+   {
+    "label": "Probe the Well",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "hull": -0.04
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   },
+   {
+    "label": "Survey for Sources",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 1
+     },
+     {
+      "fuel": -1400
+     }
+    ],
+    "hint": "Gain material but spend fuel"
+   },
+   {
+    "label": "Avoid the Pull",
+    "effects": [
+     {
+      "fuel": 1200
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but lose opportunity"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Magnetic Storm",
+  "text": "A massive magnetic field disrupts the ship's systems. Rocky says, 'field question?'",
+  "choices": [
+   {
+    "label": "Shield the Ship",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "fuel": -1600
+     }
+    ],
+    "hint": "Gain hull but spend fuel"
+   },
+   {
+    "label": "Collect Magnetic Data",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "chance": 0.4,
+      "then": [
+       {
+        "hull": 0.01
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.03
+       }
+      ]
+     }
+    ],
+    "hint": "Gain research but risk system damage"
+   },
+   {
+    "label": "Ignore and Move",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "research": -2
+     }
+    ],
+    "hint": "Save time but lose data"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Cosmic Echo",
+  "text": "Echoes of past explosions reverberate through the system. Rocky says, 'echo question?'",
+  "choices": [
+   {
+    "label": "Record the Echo",
+    "effects": [
+     {
+      "research": 7
+     },
+     {
+      "years": 0.2
+     }
+    ],
+    "hint": "Gain research but risk time"
+   },
+   {
+    "label": "Collect Echo Samples",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -1300
+     }
+    ],
+    "hint": "Gain samples but spend fuel"
+   },
+   {
+    "label": "Avoid the Echo",
+    "effects": [
+     {
+      "fuel": 1100
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but lose data"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Strange Gravity",
+  "text": "The ship's gravity readings are off. Rocky asks, 'gravity question?'",
+  "choices": [
+   {
+    "label": "Adjust Systems",
+    "effects": [
+     {
+      "hull": 0.04
+     },
+     {
+      "fuel": -1500
+     }
+    ],
+    "hint": "Gain hull but spend fuel"
+   },
+   {
+    "label": "Survey for Source",
+    "effects": [
+     {
+      "material": "gas",
+      "n": 1
+     },
+     {
+      "chance": 0.5,
+      "then": [
+       {
+        "hull": 0.01
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.03
+       }
+      ]
+     }
+    ],
+    "hint": "Gain material but risk system damage"
+   },
+   {
+    "label": "Ignore the Reading",
+    "effects": [
+     {
+      "fuel": 1000
+     },
+     {
+      "chance": 0.3,
+      "then": [
+       {
+        "hull": 0.01
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.04
+       }
+      ]
+     }
+    ],
+    "hint": "Save fuel but risk instability"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Oceanic Rift",
+  "text": "A rift opens in the ocean, revealing bioluminescent lifeforms. The ship shakes as pressure builds. Should we investigate?",
+  "choices": [
+   {
+    "label": "Investigate Rift",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": 0.1
+     }
+    ],
+    "hint": "Gain samples but risk hull integrity"
+   },
+   {
+    "label": "Avoid Rift",
+    "effects": [
+     {
+      "research": -4
+     }
+    ],
+    "hint": "Preserve hull but lose research"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Astrophage Bloom",
+  "text": "The Astrophage blooms near the ship, creating a luminous halo. Rocky says, 'amaze' and points at the light. The swarm is distracted.",
+  "choices": [
+   {
+    "label": "Lure the swarm",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain samples but risk hull damage"
+   },
+   {
+    "label": "Scan the bloom",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "fuel": -1000
+     }
+    ],
+    "hint": "Gain research but spend fuel"
+   },
+   {
+    "label": "Flee the area",
+    "effects": [
+     {
+      "years": 0.15
+     }
+    ],
+    "hint": "Avoid damage but lose time"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Petrova Migration",
+  "text": "The Astrophage migrates along the Petrova line. Rocky asks, 'move with them? question?', eyes wide.",
+  "choices": [
+   {
+    "label": "Follow the swarm",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": 2
+     },
+     {
+      "fuel": -1500
+     }
+    ],
+    "hint": "Gain material but risk fuel"
+   },
+   {
+    "label": "Stay and analyze",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   },
+   {
+    "label": "Use thrusters",
+    "effects": [
+     {
+      "fuel": -2000
+     }
+    ],
+    "hint": "Avoid swarm but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Swarm Near Ship",
+  "text": "The Astrophage forms a swarm near the ship. Rocky says, 'bad bad bad' and points at the ship.",
+  "choices": [
+   {
+    "label": "Fire deterrent",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": 1
+     },
+     {
+      "hull": -0.08
+     }
+    ],
+    "hint": "Gain material but risk hull"
+   },
+   {
+    "label": "Evasive maneuvers",
+    "effects": [
+     {
+      "fuel": -1200
+     }
+    ],
+    "hint": "Avoid damage but spend fuel"
+   },
+   {
+    "label": "Lure them away",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "years": 0.1
+     }
+    ],
+    "hint": "Gain samples but risk time"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Astrophage Surge",
+  "text": "The Astrophage surges in power, creating a gravity well. Rocky says, 'amaze' and stares at the force.",
+  "choices": [
+   {
+    "label": "Harvest energy",
+    "effects": [
+     {
+      "fuel": 1200
+     },
+     {
+      "hull": -0.07
+     }
+    ],
+    "hint": "Gain fuel but risk hull"
+   },
+   {
+    "label": "Stabilize ship",
+    "effects": [
+     {
+      "years": 0.12
+     }
+    ],
+    "hint": "Avoid damage but lose time"
+   },
+   {
+    "label": "Use shield boost",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "fuel": -800
+     }
+    ],
+    "hint": "Gain hull but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Petrova Rift",
+  "text": "The Astrophage opens a rift along the Petrova line. Rocky says, 'bad bad bad' and points at the rift.",
+  "choices": [
+   {
+    "label": "Probe the rift",
+    "effects": [
+     {
+      "research": 4
+     },
+     {
+      "hull": -0.06
+     }
+    ],
+    "hint": "Gain research but risk damage"
+   },
+   {
+    "label": "Close the rift",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 1
+     },
+     {
+      "fuel": -1300
+     }
+    ],
+    "hint": "Gain material but spend fuel"
+   },
+   {
+    "label": "Flee the rift",
+    "effects": [
+     {
+      "years": 0.1
+     }
+    ],
+    "hint": "Avoid damage but lose time"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Swarm Attraction",
+  "text": "The Astrophage attracts a swarm of unknown entities. Rocky says, 'amaze' and watches the swarm.",
+  "choices": [
+   {
+    "label": "Lure them in",
+    "effects": [
+     {
+      "samples": 1
+     },
+     {
+      "years": 0.08
+     }
+    ],
+    "hint": "Gain samples but risk time"
+   },
+   {
+    "label": "Fire at swarm",
+    "effects": [
+     {
+      "material": "gas",
+      "n": 1
+     },
+     {
+      "hull": -0.04
+     }
+    ],
+    "hint": "Gain material but risk hull"
+   },
+   {
+    "label": "Eject debris",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -900
+     }
+    ],
+    "hint": "Gain samples but risk fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Astrophage Pulse",
+  "text": "The Astrophage emits a powerful pulse, disrupting nearby systems. Rocky says, 'amaze' and looks at the pulse.",
+  "choices": [
+   {
+    "label": "Harvest the pulse",
+    "effects": [
+     {
+      "fuel": 1000
+     },
+     {
+      "hull": -0.03
+     }
+    ],
+    "hint": "Gain fuel but risk hull"
+   },
+   {
+    "label": "Stabilize systems",
+    "effects": [
+     {
+      "fuel": -1100
+     }
+    ],
+    "hint": "Avoid damage but spend fuel"
+   },
+   {
+    "label": "Use shield pulse",
+    "effects": [
+     {
+      "hull": 0.04
+     },
+     {
+      "fuel": -900
+     }
+    ],
+    "hint": "Gain hull but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Migration Alert",
+  "text": "The Astrophage is migrating toward a new region. Rocky says, 'bad bad bad' and points at the direction.",
+  "choices": [
+   {
+    "label": "Follow the migration",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 1
+     },
+     {
+      "years": 0.1
+     }
+    ],
+    "hint": "Gain material but risk time"
+   },
+   {
+    "label": "Stay and wait",
+    "effects": [
+     {
+      "years": 0.15
+     }
+    ],
+    "hint": "Avoid damage but lose time"
+   },
+   {
+    "label": "Use thrusters",
+    "effects": [
+     {
+      "fuel": -1400
+     }
+    ],
+    "hint": "Avoid swarm but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Cartographer Echo",
+  "text": "A relay buoy flickers to life. Static crackles through the comms. You hear a whisper in a language you don't understand.",
+  "choices": [
+   {
+    "label": "Intercept Signal",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research, risk hull damage"
+   },
+   {
+    "label": "Attempt Repair",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 2
+     },
+     {
+      "fuel": -1000
+     }
+    ],
+    "hint": "Gain materials, spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Fading Beacon",
+  "text": "A Cartographer buoy is barely holding. It emits a weak pulse that disturbs nearby space.",
+  "choices": [
+   {
+    "label": "Stabilize Beacon",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -1200
+     }
+    ],
+    "hint": "Gain samples, risk fuel"
+   },
+   {
+    "label": "Scramble Data",
+    "effects": [
+     {
+      "research": 4
+     },
+     {
+      "hull": -0.03
+     }
+    ],
+    "hint": "Gain research, risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Relay Disturbance",
+  "text": "A sudden surge of energy disrupts the Astrophage lane. The ship lurches slightly.",
+  "choices": [
+   {
+    "label": "Steady Course",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": -1
+     }
+    ],
+    "hint": "Stable, but lose material"
+   },
+   {
+    "label": "Realign Lane",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "fuel": -1500
+     }
+    ],
+    "hint": "Gain research, risk fuel"
+   },
+   {
+    "label": "Scan Disturbance",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": -0.04
+     }
+    ],
+    "hint": "Gain samples, risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Cartographer Cache",
+  "text": "A sealed data core is found near a long-dead relay. It glows faintly with ancient energy.",
+  "choices": [
+   {
+    "label": "Extract Core",
+    "effects": [
+     {
+      "research": 7
+     },
+     {
+      "fuel": -1800
+     }
+    ],
+    "hint": "Gain research, risk fuel"
+   },
+   {
+    "label": "Scan for Data",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "hull": -0.02
+     }
+    ],
+    "hint": "Gain samples, risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Ghost Signal",
+  "text": "A ghostly signal pulses through the Astrophage. It seems to be trying to communicate.",
+  "choices": [
+   {
+    "label": "Respond Signal",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "fuel": -1300
+     }
+    ],
+    "hint": "Gain research, risk fuel"
+   },
+   {
+    "label": "Intercept Data",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain samples, risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Broken Relay",
+  "text": "A relay is damaged, emitting erratic pulses that warp nearby space.",
+  "choices": [
+   {
+    "label": "Stabilize Relay",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": 2
+     },
+     {
+      "fuel": -1000
+     }
+    ],
+    "hint": "Gain materials, risk fuel"
+   },
+   {
+    "label": "Leave Damaged",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": -1
+     }
+    ],
+    "hint": "Save fuel, lose materials"
+   },
+   {
+    "label": "Scan for Cause",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "hull": -0.03
+     }
+    ],
+    "hint": "Gain samples, risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Cartographer Relic",
+  "text": "A small, ancient device is found near a relay. It emits a faint hum when touched.",
+  "choices": [
+   {
+    "label": "Activate Relic",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "hull": -0.04
+     }
+    ],
+    "hint": "Gain research, risk hull"
+   },
+   {
+    "label": "Scan Relic",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "fuel": -1200
+     }
+    ],
+    "hint": "Gain samples, risk fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Echoed Message",
+  "text": "A message from the Cartographers is received. It speaks of an ancient warning, but the meaning is unclear.",
+  "choices": [
+   {
+    "label": "Decipher Message",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "fuel": -1400
+     }
+    ],
+    "hint": "Gain research, risk fuel"
+   },
+   {
+    "label": "Scan for Clues",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "hull": -0.03
+     }
+    ],
+    "hint": "Gain samples, risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "The Dreamer of Nebulae",
+  "text": "A being made of nebulae speaks in riddles. It offers a vision of the future in exchange for your ship\u2019s research.",
+  "choices": [
+   {
+    "label": "Give research",
+    "effects": [
+     {
+      "research": -4
+     },
+     {
+      "samples": 3
+     }
+    ],
+    "hint": "Gain vision, lose knowledge"
+   },
+   {
+    "label": "Stay silent",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "samples": -1
+     }
+    ],
+    "hint": "Avoid risk, miss reward"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Stellar Bloom",
+  "text": "A nebula blooms ahead, glowing with colors unseen. The ship's sensors detect a rare element within. Will you dive in or keep moving?",
+  "choices": [
+   {
+    "label": "Dive In",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain samples but risk hull damage"
+   },
+   {
+    "label": "Keep Moving",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "samples": -1
+     }
+    ],
+    "hint": "Save hull but miss samples"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Celestial Drift",
+  "text": "A drifting asteroid field appears. You can either navigate through it or collect materials from it.",
+  "choices": [
+   {
+    "label": "Navigate Through",
+    "effects": [
+     {
+      "fuel": -500
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Risk damage but save fuel"
+   },
+   {
+    "label": "Collect Materials",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 2
+     },
+     {
+      "fuel": -1000
+     }
+    ],
+    "hint": "Gain minerals but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Singularity Echo",
+  "text": "A faint echo of a black hole's gravity pulls the ship. You must either resist or collect volatile gases.",
+  "choices": [
+   {
+    "label": "Resist Gravity",
+    "effects": [
+     {
+      "fuel": -2000
+     },
+     {
+      "hull": 0.05
+     }
+    ],
+    "hint": "Save hull but lose fuel"
+   },
+   {
+    "label": "Collect Gases",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": 2
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain volatiles but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Relativistic Storm",
+  "text": "A storm of high-energy particles swirls around the ship. You can either absorb the energy or avoid it.",
+  "choices": [
+   {
+    "label": "Absorb Energy",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   },
+   {
+    "label": "Avoid Storm",
+    "effects": [
+     {
+      "fuel": -1500
+     },
+     {
+      "hull": 0.05
+     }
+    ],
+    "hint": "Save hull but lose fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Stellar Drift",
+  "text": "A nearby star's radiation fluctuates, creating a temporary energy surge. You can harness it or ignore it.",
+  "choices": [
+   {
+    "label": "Harness Energy",
+    "effects": [
+     {
+      "fuel": 3000
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain fuel but risk hull"
+   },
+   {
+    "label": "Ignore Storm",
+    "effects": [
+     {
+      "fuel": -1000
+     },
+     {
+      "hull": 0.05
+     }
+    ],
+    "hint": "Save hull but lose fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Time Wobble",
+  "text": "The ship experiences a time dilation event. You can either stay in time or jump ahead.",
+  "choices": [
+   {
+    "label": "Stay In Time",
+    "effects": [
+     {
+      "years": 0.15
+     },
+     {
+      "fuel": -2000
+     }
+    ],
+    "hint": "Gain years but lose fuel"
+   },
+   {
+    "label": "Jump Ahead",
+    "effects": [
+     {
+      "years": 0.05
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Skip time but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Gravitational Anomaly",
+  "text": "A gravitational anomaly distorts the ship's path. You must either take a shortcut or collect gas.",
+  "choices": [
+   {
+    "label": "Take Shortcut",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "fuel": -1500
+     }
+    ],
+    "hint": "Save time but lose fuel"
+   },
+   {
+    "label": "Collect Gas",
+    "effects": [
+     {
+      "material": "gas",
+      "n": 2
+     },
+     {
+      "years": 0.05
+     }
+    ],
+    "hint": "Gain gas but spend time"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Warp Core Flare",
+  "text": "The warp core flickers violently. Sparks fly from the containment rings. You hear a faint whine from the engine.",
+  "choices": [
+   {
+    "label": "Dump coolant",
+    "effects": [
+     {
+      "fuel": -1000
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Cool the core, risk hull integrity"
+   },
+   {
+    "label": "Stabilize core",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "years": 0.05
+     }
+    ],
+    "hint": "Fix the core, spend research"
+   },
+   {
+    "label": "Re-route power",
+    "effects": [
+     {
+      "fuel": 500
+     },
+     {
+      "chance": 0.6,
+      "then": [
+       {
+        "hull": 0.05
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.15
+       }
+      ]
+     }
+    ],
+    "hint": "Gain energy, risk system failure"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Sensor Malfunction",
+  "text": "The sensors go offline. The bridge is plunged into darkness. Rocky mutters something about \"bad bad bad\".",
+  "choices": [
+   {
+    "label": "Reboot sensors",
+    "effects": [
+     {
+      "years": 0.15
+     },
+     {
+      "hull": 0.05
+     }
+    ],
+    "hint": "Regain vision, lose time"
+   },
+   {
+    "label": "Use manual scan",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "chance": 0.5,
+      "then": [
+       {
+        "hull": 0.02
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.1
+       }
+      ]
+     }
+    ],
+    "hint": "Gain data, risk system damage"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Flickering Star",
+  "text": "The star pulses with an unusual rhythm. It's as if the system is breathing. Is it natural or artificial? question?",
+  "choices": [
+   {
+    "label": "Scan for anomalies",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research but risk hull damage"
+   },
+   {
+    "label": "Sample the light",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -500
+     }
+    ],
+    "hint": "Gain samples but lose fuel"
+   },
+   {
+    "label": "Ignore the pulse",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Orbital Echo",
+  "text": "The planet's orbit seems to mirror the star's. It's an odd gravitational dance. Could there be an unseen mass? question?",
+  "choices": [
+   {
+    "label": "Map the orbit",
+    "effects": [
+     {
+      "research": 7
+     },
+     {
+      "years": 0.15
+     }
+    ],
+    "hint": "Gain research but risk years"
+   },
+   {
+    "label": "Probe the shadow",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": 2
+     },
+     {
+      "hull": -0.07
+     }
+    ],
+    "hint": "Gain material but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Shifting Light",
+  "text": "The star's color shifts rapidly. It's as if it's changing in real-time. Could it be an artificial beacon? question?",
+  "choices": [
+   {
+    "label": "Analyze the spectrum",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "material": "volatiles",
+      "n": -1
+     }
+    ],
+    "hint": "Gain research but risk material"
+   },
+   {
+    "label": "Sample the light",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -500
+     }
+    ],
+    "hint": "Gain samples but lose fuel"
+   },
+   {
+    "label": "Ignore the shift",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Magnetic Drift",
+  "text": "The magnetic field of the star is fluctuating. It's like the system is unstable. Could it be a warning? question?",
+  "choices": [
+   {
+    "label": "Measure the field",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   },
+   {
+    "label": "Sample the field",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 1
+     },
+     {
+      "fuel": -400
+     }
+    ],
+    "hint": "Gain material but lose fuel"
+   },
+   {
+    "label": "Ignore the drift",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -2
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Stellar Pulse",
+  "text": "The star emits regular pulses. It's like it's sending a message. Could it be an alien signal? question?",
+  "choices": [
+   {
+    "label": "Decipher the pulse",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "years": 0.1
+     }
+    ],
+    "hint": "Gain research but risk years"
+   },
+   {
+    "label": "Sample the pulse",
+    "effects": [
+     {
+      "samples": 1
+     },
+     {
+      "fuel": -400
+     }
+    ],
+    "hint": "Gain samples but lose fuel"
+   },
+   {
+    "label": "Ignore the signal",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Eclipsing Star",
+  "text": "A planet seems to eclipse the star in a pattern. It's not natural. Could it be a machine? question?",
+  "choices": [
+   {
+    "label": "Map the eclipse",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "years": 0.1
+     }
+    ],
+    "hint": "Gain research but risk years"
+   },
+   {
+    "label": "Sample the eclipse",
+    "effects": [
+     {
+      "material": "gas",
+      "n": 1
+     },
+     {
+      "fuel": -400
+     }
+    ],
+    "hint": "Gain material but lose fuel"
+   },
+   {
+    "label": "Ignore the pattern",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -2
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   }
+  ]
+ },
+ {
+  "trigger": "arrive",
+  "weight": 0.6,
+  "title": "Stellar Shadow",
+  "text": "A dark shape moves across the star. It's not a planet. Could it be a shield or a structure? question?",
+  "choices": [
+   {
+    "label": "Track the shadow",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "years": 0.1
+     }
+    ],
+    "hint": "Gain research but risk years"
+   },
+   {
+    "label": "Sample the shadow",
+    "effects": [
+     {
+      "samples": 1
+     },
+     {
+      "fuel": -400
+     }
+    ],
+    "hint": "Gain samples but lose fuel"
+   },
+   {
+    "label": "Ignore the shape",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -2
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Ice Moon Sample",
+  "text": "A drill penetrates the ice, revealing a frozen ocean beneath. The ice is thick with ancient structures.",
+  "choices": [
+   {
+    "label": "Extract ice core",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": 2
+     },
+     {
+      "years": 0.15
+     }
+    ],
+    "hint": "Gain volatile material but spend years"
+   },
+   {
+    "label": "Scan for structures",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Lava World Crash",
+  "text": "The ship is caught in a lava flow. The heat is intense, and the terrain is unstable.",
+  "choices": [
+   {
+    "label": "Use heat shield",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "fuel": -800
+     }
+    ],
+    "hint": "Protect hull but lose fuel"
+   },
+   {
+    "label": "Reroute to safety",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain time but risk damage"
+   },
+   {
+    "label": "Stay and collect",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 2
+     },
+     {
+      "hull": -0.15
+     }
+    ],
+    "hint": "Gain minerals but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Desert Anomaly",
+  "text": "A shimmering dune moves unexpectedly. The air is thick with unknown particles.",
+  "choices": [
+   {
+    "label": "Collect dust",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": 2
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain silicates but risk hull"
+   },
+   {
+    "label": "Analyze atmosphere",
+    "effects": [
+     {
+      "research": 4
+     },
+     {
+      "fuel": -600
+     }
+    ],
+    "hint": "Gain research but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Gas Giant Storm",
+  "text": "The ship is caught in a violent storm of gas and lightning. The atmosphere is dense and volatile.",
+  "choices": [
+   {
+    "label": "Scoop gas",
+    "effects": [
+     {
+      "material": "gas",
+      "n": 2
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain gas but risk hull"
+   },
+   {
+    "label": "Stabilize ship",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "fuel": -900
+     }
+    ],
+    "hint": "Protect hull but spend fuel"
+   },
+   {
+    "label": "Escape the storm",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain time but risk damage"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Tectonic Shift",
+  "text": "The planet's crust is shifting. The ground cracks and trembles underfoot.",
+  "choices": [
+   {
+    "label": "Dig for minerals",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 2
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain minerals but risk hull"
+   },
+   {
+    "label": "Stabilize position",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "fuel": -700
+     }
+    ],
+    "hint": "Protect hull but lose fuel"
+   },
+   {
+    "label": "Reroute to safety",
+    "effects": [
+     {
+      "years": 0.1
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain time but risk damage"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Deep Ocean Sample",
+  "text": "A submersible reaches the ocean floor, revealing a deep trench with unknown life.",
+  "choices": [
+   {
+    "label": "Collect sample",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -1000
+     }
+    ],
+    "hint": "Gain samples but spend fuel"
+   },
+   {
+    "label": "Analyze lifeforms",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "survey",
+  "weight": 0.6,
+  "title": "Ice Core Drift",
+  "text": "The ice core is shifting unexpectedly. The drill is stuck in an ancient tunnel.",
+  "choices": [
+   {
+    "label": "Force extraction",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": 2
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain volatile material but risk hull"
+   },
+   {
+    "label": "Stabilize drill",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "fuel": -800
+     }
+    ],
+    "hint": "Protect hull but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Silent Lab",
+  "text": "The hum of the reactor fills the silence. Rocky is calibrating a xenonite array. You hear a faint message from Earth, but it\u2019s garbled.",
+  "choices": [
+   {
+    "label": "Listen to message",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain research but risk hull damage"
+   },
+   {
+    "label": "Ignore message",
+    "effects": [
+     {
+      "research": -3
+     },
+     {
+      "hull": 0.02
+     }
+    ],
+    "hint": "Save hull but lose research"
+   },
+   {
+    "label": "Check xenonite",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": 2
+     },
+     {
+      "fuel": -500
+     }
+    ],
+    "hint": "Gain material but spend fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Xenonite Forge",
+  "text": "Rocky is forging a new device from xenonite. It glows with unstable energy. He says, 'amaze' and asks, 'ready? question?'",
+  "choices": [
+   {
+    "label": "Help forge device",
+    "effects": [
+     {
+      "material": "minerals",
+      "n": 1
+     },
+     {
+      "fuel": -300
+     }
+    ],
+    "hint": "Gain material but risk fuel"
+   },
+   {
+    "label": "Refuse to help",
+    "effects": [
+     {
+      "fuel": 200
+     },
+     {
+      "material": "minerals",
+      "n": -1
+     }
+    ],
+    "hint": "Save fuel but lose material"
+   },
+   {
+    "label": "Leave device",
+    "effects": [
+     {
+      "chance": 0.6,
+      "then": [
+       {
+        "hull": 0.05
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.08
+       }
+      ]
+     }
+    ],
+    "hint": "No gain but risk alarm"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Message from Earth",
+  "text": "A message arrives, years late. It's a warning about a solar flare. Rocky says, 'bad bad bad question?'",
+  "choices": [
+   {
+    "label": "Acknowledge warning",
+    "effects": [
+     {
+      "research": 4
+     },
+     {
+      "fuel": -400
+     }
+    ],
+    "hint": "Gain research but risk fuel"
+   },
+   {
+    "label": "Ignore warning",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   },
+   {
+    "label": "Ask Rocky",
+    "effects": [
+     {
+      "research": 2
+     },
+     {
+      "years": 0.05
+     }
+    ],
+    "hint": "Gain insight but spend time"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Xenonite Core",
+  "text": "Rocky is testing a xenonite core. It flickers with unstable energy. He says, 'amaze' and asks, 'safe? question?'",
+  "choices": [
+   {
+    "label": "Stabilize core",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": 2
+     },
+     {
+      "hull": -0.03
+     }
+    ],
+    "hint": "Gain material but risk hull"
+   },
+   {
+    "label": "Leave core",
+    "effects": [
+     {
+      "chance": 0.7,
+      "then": [
+       {
+        "hull": 0.04
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.07
+       }
+      ]
+     }
+    ],
+    "hint": "No gain but risk alarm"
+   },
+   {
+    "label": "Monitor core",
+    "effects": [
+     {
+      "research": 3
+     },
+     {
+      "years": 0.08
+     }
+    ],
+    "hint": "Gain research but spend time"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Hull Integrity",
+  "text": "The hull is showing minor stress. Rocky says, 'bad bad bad question?' and suggests reinforcing it.",
+  "choices": [
+   {
+    "label": "Reinforce hull",
+    "effects": [
+     {
+      "hull": 0.06
+     },
+     {
+      "fuel": -600
+     }
+    ],
+    "hint": "Gain hull but spend fuel"
+   },
+   {
+    "label": "Ignore hull",
+    "effects": [
+     {
+      "fuel": 400
+     },
+     {
+      "hull": -0.04
+     }
+    ],
+    "hint": "Save fuel but risk damage"
+   },
+   {
+    "label": "Check logs",
+    "effects": [
+     {
+      "research": 2
+     },
+     {
+      "years": 0.03
+     }
+    ],
+    "hint": "Gain research but spend time"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Data Corrupted",
+  "text": "A data stream from Earth is corrupted. Rocky says, 'bad bad bad question?' and asks, 'fix? question?'",
+  "choices": [
+   {
+    "label": "Fix data",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "fuel": -500
+     }
+    ],
+    "hint": "Gain research but risk fuel"
+   },
+   {
+    "label": "Ignore data",
+    "effects": [
+     {
+      "fuel": 300
+     },
+     {
+      "research": -3
+     }
+    ],
+    "hint": "Save fuel but lose research"
+   },
+   {
+    "label": "Ask Rocky",
+    "effects": [
+     {
+      "research": 2
+     },
+     {
+      "years": 0.06
+     }
+    ],
+    "hint": "Gain insight but spend time"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Xenonite Refinement",
+  "text": "Rocky is refining xenonite into a new alloy. It glows with potential. He says, 'amaze' and asks, 'ready? question?'",
+  "choices": [
+   {
+    "label": "Help refine",
+    "effects": [
+     {
+      "material": "gas",
+      "n": 1
+     },
+     {
+      "fuel": -300
+     }
+    ],
+    "hint": "Gain material but risk fuel"
+   },
+   {
+    "label": "Refuse to help",
+    "effects": [
+     {
+      "fuel": 200
+     },
+     {
+      "material": "gas",
+      "n": -1
+     }
+    ],
+    "hint": "Save fuel but lose material"
+   },
+   {
+    "label": "Leave refining",
+    "effects": [
+     {
+      "chance": 0.5,
+      "then": [
+       {
+        "hull": 0.03
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.06
+       }
+      ]
+     }
+    ],
+    "hint": "No gain but risk alarm"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Migration Path",
+  "text": "The Astrophage is migrating along the Petrova line. Rocky says, 'Track it? Question?'",
+  "choices": [
+   {
+    "label": "Follow Migration",
+    "effects": [
+     {
+      "research": 5
+     },
+     {
+      "fuel": -1500
+     }
+    ],
+    "hint": "Gain research but risk fuel"
+   },
+   {
+    "label": "Scan Path",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain samples but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Swarms Near",
+  "text": "A swarm of Astrophage is closing in. Rocky says, 'Evasion? Question?'",
+  "choices": [
+   {
+    "label": "Evasion Maneuver",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "fuel": -2000
+     }
+    ],
+    "hint": "Gain hull but lose fuel"
+   },
+   {
+    "label": "Lure Swarm",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain samples but risk hull"
+   },
+   {
+    "label": "Fire Warning",
+    "effects": [
+     {
+      "chance": 0.5,
+      "then": [
+       {
+        "hull": 0.05
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.15
+       }
+      ]
+     }
+    ],
+    "hint": "Risk chance of damage"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Petrova Pulse",
+  "text": "The Petrova line is pulsing with energy. Rocky says, 'Tap it? Question?'",
+  "choices": [
+   {
+    "label": "Tap the Pulse",
+    "effects": [
+     {
+      "research": 6
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   },
+   {
+    "label": "Store Energy",
+    "effects": [
+     {
+      "fuel": 2000
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain fuel but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Swarm Surge",
+  "text": "A surge of Astrophage is approaching. Rocky says, 'Deflect? Question?'",
+  "choices": [
+   {
+    "label": "Deflect Swarm",
+    "effects": [
+     {
+      "hull": 0.08
+     },
+     {
+      "fuel": -3000
+     }
+    ],
+    "hint": "Gain hull but lose fuel"
+   },
+   {
+    "label": "Draw Them In",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": -0.15
+     }
+    ],
+    "hint": "Gain samples but risk hull"
+   },
+   {
+    "label": "Fire Warning",
+    "effects": [
+     {
+      "chance": 0.6,
+      "then": [
+       {
+        "hull": 0.05
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.15
+       }
+      ]
+     }
+    ],
+    "hint": "Risk chance of damage"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Bloom Surge",
+  "text": "The Astrophage bloom has intensified, causing turbulence. Rocky says, 'Stabilize? Question?'",
+  "choices": [
+   {
+    "label": "Stabilize Bloom",
+    "effects": [
+     {
+      "hull": 0.1
+     },
+     {
+      "fuel": -1200
+     }
+    ],
+    "hint": "Gain hull but lose fuel"
+   },
+   {
+    "label": "Harvest Energy",
+    "effects": [
+     {
+      "material": "volatiles",
+      "n": 3
+     },
+     {
+      "hull": -0.05
+     }
+    ],
+    "hint": "Gain volatile but risk hull"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Migration Rift",
+  "text": "A rift is opening in the migration path. Rocky says, 'Investigate? Question?'",
+  "choices": [
+   {
+    "label": "Investigate Rift",
+    "effects": [
+     {
+      "research": 7
+     },
+     {
+      "hull": -0.1
+     }
+    ],
+    "hint": "Gain research but risk hull"
+   },
+   {
+    "label": "Avoid Rift",
+    "effects": [
+     {
+      "hull": 0.05
+     },
+     {
+      "research": -4
+     }
+    ],
+    "hint": "Save hull but lose research"
+   },
+   {
+    "label": "Scan Rift",
+    "effects": [
+     {
+      "samples": 2
+     },
+     {
+      "fuel": -500
+     }
+    ],
+    "hint": "Gain samples but risk fuel"
+   }
+  ]
+ },
+ {
+  "trigger": "random",
+  "weight": 0.6,
+  "title": "Swarms Merge",
+  "text": "Multiple swarms are merging near the ship. Rocky says, 'Break Them? Question?'",
+  "choices": [
+   {
+    "label": "Break Swarms",
+    "effects": [
+     {
+      "hull": 0.08
+     },
+     {
+      "fuel": -2500
+     }
+    ],
+    "hint": "Gain hull but lose fuel"
+   },
+   {
+    "label": "Lure and Harvest",
+    "effects": [
+     {
+      "samples": 3
+     },
+     {
+      "hull": -0.15
+     }
+    ],
+    "hint": "Gain samples but risk hull"
+   },
+   {
+    "label": "Fire Warning",
+    "effects": [
+     {
+      "chance": 0.5,
+      "then": [
+       {
+        "hull": 0.05
+       }
+      ],
+      "else": [
+       {
+        "hull": -0.15
+       }
+      ]
+     }
+    ],
+    "hint": "Risk chance of damage"
+   }
+  ]
+ },
+ {
+  "trigger": "flight",
+  "weight": 0.6,
+  "title": "Luminous Exchange",
+  "text": "A glowing alien offers a crystal in exchange for your ship's core. They call it a 'light bridge.'",
+  "choices": [
+   {
+    "label": "Give core take crystal",
+    "effects": [
+     {
+      "material": "silicates",
+      "n": 2
+     },
+     {
+      "hull": 0.1
+     }
+    ],
+    "hint": "Gain a powerful crystal, lose ship integrity"
+   },
+   {
+    "label": "Refuse trade",
+    "effects": [
+     {
+      "chance": 0.5,
+      "then": [
+       {
+        "hull": -0.15
+       }
+      ],
+      "else": []
+     }
+    ],
+    "hint": "Keep core, risk alien hostility"
+   }
+  ]
+ }
+]
