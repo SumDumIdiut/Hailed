@@ -5,6 +5,8 @@ export function createLab(api) {
   const root = $('panel-lab');
   let history = [], nitrogen = 10, last = '';
   let selectedStrainId = null, focusTrait = null, genStatus = '', genStatusBad = false;
+  // A prologue game carries campaign.prologue; old saves keep the original nitrogen lab.
+  const isPrologue = (st) => !!(st && st.campaign && st.campaign.prologue && (st.campaign.act ?? 1) === 1);
   function reset() { history = []; last = ''; selectedStrainId = null; focusTrait = null; genStatus = ''; genStatusBad = false; }
   function statusHtml() {
     return genStatus
@@ -75,9 +77,27 @@ export function createLab(api) {
     chart($('lab-chart'));
   }
 
+  // Sol and Erid are the prologue's two targets: show their requirement bars side by side.
+  function prologueBars(st, sim, bestStrain) {
+    if (typeof sim.biosphereProfile !== 'function' || typeof sim.coverage !== 'function') return '';
+    let h = `<h4>Prologue targets <span class="dim">Sol + Erid together</span></h4><div class="prologue-targets">`;
+    for (const [id, label] of [['sol', 'SOL · EARTH'], ['eri40', '40 ERIDANI · ERID']]) {
+      const star = (st.stars || []).find((s) => s.id === id);
+      if (!star) continue;
+      const profile = sim.biosphereProfile(star);
+      const cov = bestStrain ? sim.coverage(bestStrain, profile) : 0;
+      const need = profile?.nitrogen ?? 0, have = bestStrain?.traits?.nitrogen ?? 0;
+      h += `<div class="prologue-target"><div class="row"><span>${label}</span><span class="${cov >= 1 ? 'ok' : 'warn'}">${Math.round(cov * 100)}%</span></div>`;
+      h += `<div class="bio-row"><span>NEED N</span><div class="bio-bar"><i style="width:${Math.round(need * 100)}%"></i></div><span>${Math.round(need * 100)}%</span></div>`;
+      h += `<div class="bio-row"><span>HAVE N</span><div class="bio-bar"><i style="width:${Math.round(have * 100)}%"></i></div><span>${Math.round(have * 100)}%</span></div></div>`;
+    }
+    return h + '</div>';
+  }
+
   function renderGenetics() {
     const st = api.state();
     const sim = api.sim;
+    const prologue = isPrologue(st);
     const g = st.genetics || { strains: [], nextId: 1, best: null };
     const strains = g.strains || [];
     const bestStrain = strains.find((x) => x.id === g.best) || strains[strains.length - 1] || null;
@@ -89,6 +109,7 @@ export function createLab(api) {
     // Keep the player's choices across re-renders, falling back if a strain was culled by breeding.
     if (selectedStrainId && !strains.some((x) => x.id === selectedStrainId)) selectedStrainId = null;
     const selectedStrain = strains.find((x) => x.id === selectedStrainId) || bestStrain;
+    if (prologue && !focusTrait) focusTrait = 'nitrogen';
     if (!sim.TRAITS.includes(focusTrait)) focusTrait = focusFor(selectedStrain, profile);
 
     if (!strains.length) {
@@ -150,6 +171,7 @@ export function createLab(api) {
         : `<span class="dim">All biosphere requirements covered.</span>`;
       h += `</div>`;
     }
+    if (prologue) h += prologueBars(st, sim, bestStrain);
     h += `<div class="btns"><button class="primary" id="lab-deliver">DELIVER HERE</button></div>`;
     h += statusHtml();
 
@@ -206,7 +228,8 @@ export function createLab(api) {
 
   function render() {
     const st = api.state();
-    if (st.campaign && st.campaign.act >= 2) { renderGenetics(); return; }
+    // Any save with campaign + genetics uses the trait lab, including the Act I prologue.
+    if (st.genetics && st.campaign) { renderGenetics(); return; }
     renderOld();
   }
 

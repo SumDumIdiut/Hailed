@@ -24,7 +24,51 @@ export function nextTarget(sim, st) {
   return left.sort((a, b) => years(a) - years(b))[0];
 }
 
-// -> { stage: 'n/4', goal, act }
+const pct = (v) => Math.round(Math.max(0, Math.min(1, Number(v) || 0)) * 100);
+
+// Prologue states carry campaign.prologue; old Act I saves do not and keep the original directive.
+function prologueStep(sim, st) {
+  if (!(st && st.campaign && st.campaign.prologue && (st.campaign.act ?? 1) === 1)) return null;
+  if (typeof sim.prologueStep !== 'function') return null;
+  try { return sim.prologueStep(st); } catch (_) { return null; }
+}
+
+// Coverage of a prologue target by the best strain on hand (Sol and Erid are shown together).
+function targetCoverage(sim, st, id) {
+  const star = (st.stars || []).find((s) => s.id === id);
+  if (!star || typeof sim.biosphereProfile !== 'function' || typeof sim.coverage !== 'function') return 0;
+  const profile = sim.biosphereProfile(star);
+  let best = 0;
+  for (const s of (st.genetics?.strains || [])) {
+    try { best = Math.max(best, sim.coverage(s, profile) || 0); } catch (_) {}
+  }
+  return best;
+}
+
+const PROLOGUE_N = { scan: 1, sample: 2, breed: 3, beetle: 4, jump: 5, deliver: 6, done: 6 };
+
+function prologueObjective(sim, st, step) {
+  const stage = `PROLOGUE ${PROLOGUE_N[step] || 1}/6`;
+  if (step === 'scan') {
+    const ad = (st.stars.find((s) => s.id === 'tauceti')?.planets || [])
+      .find((p) => p.id === 'tauceti-3' || p.special === 'adrian');
+    const cov = ad && ad.scan ? ad.scan.coverage || 0 : 0;
+    return { stage, goal: 'Scan Adrian', act: `SCAN Adrian (SPACE to sweep) — ${pct(cov)}%` };
+  }
+  if (step === 'sample') return { stage, goal: 'Sample Adrian',
+    act: 'LIFE SIGNS → hotspot → SAMPLE. Hold SPACE in the green band until the meter fills.' };
+  if (step === 'breed') return { stage, goal: 'Breed for both worlds',
+    act: `LAB (3) → NITROGEN → BREED until covered · SOL ${pct(targetCoverage(sim, st, 'sol'))}% / ERID ${pct(targetCoverage(sim, st, 'eri40'))}%` };
+  if (step === 'beetle') return { stage, goal: 'Send a Beetle to Sol',
+    act: 'NAV (1) → select Sol → LAUNCH BEETLE (free, 0.99c).' };
+  if (step === 'jump') return { stage, goal: 'Jump to 40 Eridani',
+    act: 'NAV (1) → select 40 Eridani → SPIN DRIVE: ENGAGE.' };
+  if (step === 'deliver') return { stage, goal: 'Deliver at 40 Eridani',
+    act: 'LAB (3) → select the covering strain → DELIVER HERE.' };
+  return { stage, goal: 'Prologue complete', act: 'Act II begins — the Beetle is guaranteed to save Sol.' };
+}
+
+// -> { stage: 'n/4' | 'PROLOGUE n/6' | '!' | '-', goal, act }
 export function objectiveFor(sim, st) {
   const sh = st.ship, star = st.stars.find((s) => s.id === sh.starId);
   if (!star) return null;
@@ -32,6 +76,10 @@ export function objectiveFor(sim, st) {
   // ---- won / lost ----
   if (st.status === 'won') return { stage: '4/4', goal: 'Both worlds saved', act: 'Astrophage is receding. You won.' };
   if (st.status === 'lost') return { stage: '-', goal: 'Mission failed', act: 'Start a new game from the title screen.' };
+
+  // ---- prologue: one clear action per sim step ----
+  const step = prologueStep(sim, st);
+  if (step) return prologueObjective(sim, st, step);
 
   // ---- Rocky directives ----
   const r = st.rocky;
@@ -121,7 +169,8 @@ export function createObjective(sim) {
       const o = objectiveFor(sim, state), key = o.stage + o.goal + o.act;
       if (key === last) return;
       last = key;
-      $('obj-stage').textContent = o.stage === '!' ? 'ALERT' : o.stage === '-' ? '' : 'Stage ' + o.stage;
+      $('obj-stage').textContent = o.stage === '!' ? 'ALERT' : o.stage === '-' ? ''
+        : o.stage.startsWith('PROLOGUE') ? o.stage : 'Stage ' + o.stage;
       $('objective').classList.toggle('alert', o.stage === '!');
       $('obj-goal').textContent = o.goal;
       $('obj-act').textContent = o.act;

@@ -271,6 +271,7 @@ window.addEventListener('keyup', (e) => { if (state && scene === 'planet') ops.k
 // ---- game start --------------------------------------------------------
 function startGame(s, sceneName) {
   state = s; ended = false; selectedPlanet = null; tutorial.newSession();
+  $('new-choice').classList.add('hidden');
   $('modal').classList.add('hidden'); $('title').classList.add('hidden');
   Object.assign(camSys, SYSTEM_CAM); camStar = null; Object.assign(camPlanet, PLANET_CAM);
   ops.reset(); sysUI.resetNotes(); lab.reset(); blip.reset(); rockybar.reset(); mapView.select(null);
@@ -278,12 +279,20 @@ function startGame(s, sceneName) {
   hud.show(true); hud.update(state); hud.renderLog(state);
   setScene(sceneName || 'map');
 }
-function newGame(sceneName) {
-  const s = sim.createGame(1);
+function newGame(sceneName, opts = {}) {
+  const s = sim.createGame(1, opts);
+  // A skip can keep campaign.prologue (it is "as if completed"): mark it so no prologue UI appears.
+  if (opts.skipPrologue && s.campaign) s.campaign.uiSkipPrologue = true;
   if (!pastTutorial(s)) tutorial.replay();
   startGame(s, sceneName); save();
-  actCard({ kicker: 'ACT I', title: 'HAIL MARY', subtitle: 'The stars are dimming. You are the last ship.' });   // not awaited: the tutorial starts underneath
-} // a new game only replays the tutorial when it is still Act I of the campaign
+  const prologue = !!(s.campaign && s.campaign.prologue);
+  // Show the card the state asks for ourselves, then clear it so the frame loop does not replay it.
+  const card = prologue
+    ? { kicker: 'ACT I', title: 'HAIL MARY', subtitle: 'Prologue' }
+    : (s.campaign && s.campaign.pendingCard) || { kicker: 'ACT II', title: 'THE SPREAD', subtitle: 'The stars are dimming. You are the last ship.' };
+  if (s.campaign) s.campaign.pendingCard = null;
+  actCard(card);   // not awaited: the tutorial starts underneath
+} // the prologue replays its tutorial; a skip lands in Act II with its own card
 function continueGame() {
   try {
     const s = sim.deserialize(localStorage.getItem(SAVE_KEY));
@@ -305,7 +314,10 @@ function quit() {
   if (done) return;
   try { window.close(); } catch (_) {}
 }
-$('btn-new').addEventListener('click', () => newGame('map'));
+$('btn-new').addEventListener('click', () => $('new-choice').classList.remove('hidden'));
+$('choice-back').addEventListener('click', () => $('new-choice').classList.add('hidden'));
+$('choice-prologue').addEventListener('click', () => { $('new-choice').classList.add('hidden'); newGame('map'); });
+$('choice-skip').addEventListener('click', () => { $('new-choice').classList.add('hidden'); newGame('map', { skipPrologue: true }); });
 $('btn-continue').addEventListener('click', continueGame);
 $('btn-endless').addEventListener('click', () => {
   tutorial.suppress();   // endless starts straight into the front, no tutorial

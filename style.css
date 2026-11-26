@@ -247,6 +247,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 .bar i{position:absolute;inset:0 auto 0 0;width:50%;background:var(--acc)}
 .bar::after,.ops-bar::after,.cm-bar::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0 5px,#05080d 5px 6px)}
 canvas.chart{width:100%;height:132px;background:#070b10;display:block}
+.prologue-targets{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:760px){.prologue-targets{grid-template-columns:1fr}}
+.prologue-target{border:1px solid var(--line2);background:#070b11;padding:6px 9px;min-width:0}
+.prologue-target .row{margin-bottom:5px}
 .risk{height:12px;border:1px solid #33425a;position:relative;margin-top:5px;background:#05080d}
 .risk b{position:absolute;top:0;bottom:0}
 .risk .z1{left:0;width:40%;background:#143038}
@@ -353,6 +357,13 @@ h1::after{content:"";display:block;height:4px;width:calc(100% - .4em);margin:cla
 .modal-inner h2{letter-spacing:.2em;font:700 24px var(--cond);margin:0 0 10px;color:var(--acc);text-transform:uppercase}
 .modal-inner p{margin:0 0 18px;font-size:15px}
 .modal-inner.lost h2{color:var(--red)}
+/* new-game choice card */
+.choice-inner{max-width:410px;width:calc(100% - 40px)}
+.choice-sub{color:var(--dim);margin:0 0 14px;font-size:13px}
+.choice-btns{display:flex;flex-direction:column;gap:8px}
+.choice-btns button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:10px 14px;letter-spacing:.1em}
+.choice-btns button small{font:10px/1 var(--mono);letter-spacing:0;text-transform:none;color:var(--dim)}
+.choice-btns button.primary small{color:#c99b4d}
 #nogl{position:absolute;top:calc(var(--deckh) + 14px);left:var(--edge);max-width:360px;padding:8px 12px;border:1px solid var(--red);border-left-width:3px;background:#0a0f16;color:var(--red);font-size:13px}
 
 /* ---- tutorial: ship-computer pop-in. The layer never blocks the game, only the box takes clicks ---- */

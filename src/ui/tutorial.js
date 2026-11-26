@@ -10,12 +10,11 @@
 // and measures the box against the target, the step's `clear` list and every control (px^2). A step PASSes with zero overlap on all.
 // Per-step `clear: [selector | fn]` = the UI the step is about; place() treats it as a no-go zone (x40) next to the target (x50).
 import { $, esc } from './util.js';
-import { nextTarget } from './objective.js';
 
-// Action-first walkthrough. Each box says what to do (exact button labels), why, and highlights the control.
-// Action steps have `done(c)` and close themselves when the player actually does the thing; info steps use "Got it".
-// Steps are checked in order and the first unseen one shows. A step whose action is already done is skipped.
-// Progress is stored in localStorage 'hailed-tutorial' as { seen: {id:true}, skipped: bool }.
+// Prologue walkthrough: at most eight short boxes, driven by sim.prologueStep(state).
+// Action boxes close themselves when the step changes; info boxes use "Got it". Warnings stay in every act.
+// Steps are checked in order and the first unseen one shows. Progress is stored in localStorage
+// 'hailed-tutorial' as { seen: {id:true}, skipped: bool }.
 // The layer never blocks the game: #tut is pointer-events:none, only the box itself takes clicks.
 const KEY = 'hailed-tutorial';
 const MARGIN = 10, GAP = 16;
@@ -42,144 +41,71 @@ export function createTutorial({ sim, getState, getScene, getSelected = () => nu
   }
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (_) {} }
 
-  const AD = 'tauceti-3';
-  const adrian = (st) => st.stars.find((s) => s.id === 'tauceti').planets.find((p) => p.id === AD);
-  const tolerant = (st) => st.lab.strains.some((s) => s.nTolerance >= 0.9 && s.population > 0);
-  const yearsLeft = (st) => ({ earth: sim.extinctionYears(st, 'earth'), erid: sim.extinctionYears(st, 'erid') });
-  const gotTaumoeba = (st) => st.ship.samples > 0 || st.lab.strains.length > 0;
+  // The prologue flag distinguishes a prologue game from an old Act I save. A skipped game can keep
+  // the flag ("as if completed"), so main.js marks it. Before the sim lands, stepOf() stays quiet.
+  // If the sim advances the act from inside prologueStep, act II still allows the completion box.
+  const stepOf = (st) => {
+    if (!st || !st.campaign || !st.campaign.prologue || st.campaign.uiSkipPrologue
+      || typeof sim.prologueStep !== 'function') return null;
+    let s = null;
+    try { s = sim.prologueStep(st); } catch (_) { return null; }
+    if ((st.campaign.act ?? 1) === 1) return s;
+    return s === 'done' ? s : null;
+  };
+  const onStep = (id) => (c) => stepOf(c.st) === id;
+  const leftStep = (id) => (c) => { const s = stepOf(c.st); return !!s && s !== id; };
   const inSys = (c) => c.scene === 'system' || c.scene === 'planet';
-  const dest = (c) => { const t = nextTarget(sim, c.st); return t && c.st.stars.find((s) => s.id === t); };
-  const destPlanet = (c) => { const d = dest(c); return d && d.planets.find((p) => p.special === 'earth' || p.special === 'erid'); };
-  const WORLDNAME = { eri40: 'Erid', sol: 'Earth' };
-  const atDest = (c) => { const d = dest(c); return !!d && c.st.ship.starId === d.id; };
 
-  // Order matters. Warnings first, then the guided route from "what is going on" to "win".
+  // Warnings first, then the eight prologue boxes in step order.
   const STEPS = [
-    { id: 'warn-years', clear: ['#h-earth-b', '#h-erid-b'], title: 'Countdown under 5 years',
-      do: 'Deliver Taumoeba to the world with the smaller number first.', why: 'A world that reaches T- 0 is lost for good, and every trip, scan and chat uses up years.',
-      when: (c) => { const y = yearsLeft(c.st); return y.earth < 5 || y.erid < 5; },
-      target: (c) => { const y = yearsLeft(c.st); return block(y.erid < y.earth ? 'h-erid' : 'h-earth')(); } },
-    { id: 'warn-hull', clear: [block('h-hull')], title: 'Hull integrity low',
-      do: 'Open BLIP-A (4). Fix hull and accept his offer.', why: 'Below 20% the spin drive refuses to fly. Needs 25% trust and 2000 kg fuel.',
+    { id: 'warn-hull', title: 'Hull integrity low',
+      do: 'Keep the hull above 20% or the spin drive refuses to fly.',
       when: (c) => c.st.ship.hull < 0.4, target: block('h-hull') },
-    { id: 'warn-risk', clear: ['#panel-lab .risk', '#tabs'], title: 'Escape risk is climbing',
-      do: 'Open BLIP-A (4). Build the Xenonite lab to contain escape risk.', why: 'Tough Taumoeba can eat through the hull. A breach cracks the hull and wipes your strains.',
-      when: (c) => c.st.lab.escapeRisk > 0.25 && !c.st.ship.upgrades.includes('xenonite-lab'),
-      target: (c) => (c.scene === 'lab' ? vis('#panel-lab .risk') : vis('#tabs [data-scene="blip"]')) },
-    { id: 'low-fuel', clear: [block('h-fuel'), '#objective'], title: 'Running low on fuel',
-      do: 'Low fuel? Gather at the Petrova planet for Astrophage fuel, or HARVEST.', why: 'Interstellar jumps burn tens of thousands of kg. Astrophage is fuel: gather it.',
+    { id: 'low-fuel', title: 'Running low on fuel',
+      do: 'HARVEST Astrophage at the Petrova planet to refill the tank.',
       when: (c) => c.st.ship.fuelKg / c.st.ship.fuelMaxKg < 0.3, target: block('h-fuel') },
 
-    // ---- the briefing ----
-    { id: 'stakes', clear: ['#h-earth-b', '#h-erid-b'], title: 'Your enemy is Astrophage',
-      do: 'There is no combat. Astrophage is eating the starlight. When Earth or Erid reaches T- 0, it is lost.',
-      why: 'These two countdowns are your health bars. You win by saving both.',
-      when: () => true, target: () => $('h-earth-b') },
-    { id: 'weapon', clear: [block('h-world')], title: 'Taumoeba is your weapon',
-      do: 'Find Taumoeba, breed it until it survives 90% nitrogen, then release it at Earth and at Erid.',
-      why: 'Time is your real resource: every trip, scan, chat and breed spends years while Astrophage keeps growing.',
-      when: (c) => c.seen.stakes, target: block('h-world') },
-    { id: 'controls', clear: ['#tabs'], title: 'Controls',
-      do: 'Drag to rotate, wheel to zoom, click to select. Keys 1-4 switch NAV / SYSTEM / LAB / BLIP-A. Esc goes back or skips a burn.',
-      why: 'You can also click the tabs at the top left of the dashboard.', when: (c) => c.seen.weapon, target: () => $('tabs') },
-    { id: 'objective', clear: ['#objective'], title: 'Follow the objective bar',
-      do: 'The OBJECTIVE bar always shows your next action. Do what it says.', why: 'It updates as you play, including when fuel or hull needs attention.',
-      when: (c) => c.seen.controls, target: () => $('objective') },
-
-    // ---- stage 1: get Taumoeba ----
-    { id: 'go-system', clear: ['#tabs'], title: 'Go to the system view',
-      do: 'Press SYSTEM (or key 2).', why: 'Tau Ceti itself is not dying. Something on a planet here eats Astrophage.',
-      when: (c) => c.st.ship.starId === 'tauceti' && !gotTaumoeba(c.st) && c.scene === 'map', scene: ['map'],
-      done: (c) => inSys(c), target: () => vis('#tabs [data-scene="system"]') },
-    { id: 'pick-adrian', clear: ['#panel-system .plist'], title: 'Select Adrian',
-      do: 'Click Adrian in the PLANETS list, or click the planet.', why: 'Adrian has a thick orange atmosphere. That is where the Taumoeba live.',
-      when: (c) => inSys(c) && c.st.ship.starId === 'tauceti' && !gotTaumoeba(c.st), scene: ['system', 'planet'],
-      done: (c) => c.selected === AD, target: () => vis('#panel-system [data-p="' + AD + '"]') },
-    { id: 'hop', clear: ['#panel-system:not(.hidden)', '#panel-planet:not(.hidden)'], title: 'Fly to orbit',
-      do: 'Press FLY TO ORBIT.', why: 'You can only sample from orbit. The transfer costs fuel and a few days, shown above the button.',
-      when: (c) => inSys(c) && c.selected === AD && c.st.ship.starId === 'tauceti' && !gotTaumoeba(c.st), scene: ['system', 'planet'],
-      done: (c) => c.st.ship.planetId === AD, target: () => vis('[data-a="hop"]') },
-    { id: 'scan', clear: ['#panel-system:not(.hidden)', '#panel-planet:not(.hidden)', '#ops-scan', '#ops-map', '#ops-cov'], title: 'Scan Adrian',
-      do: 'Press SCAN, then wait until the sweep passes 60% (the planet paints over as the ship circles).', why: 'A sweep from orbit is a full scan: the spectrometer map fills in and finds the Taumoeba signature. From far away it can not.',
-      when: (c) => inSys(c) && c.st.ship.planetId === AD && adrian(c.st).scanLevel < 2 && !gotTaumoeba(c.st), scene: ['system', 'planet'],
-      done: (c) => adrian(c.st).scanLevel >= 2, target: () => vis('[data-a="scan"]') },
-    { id: 'life-layer', clear: ['#ops-map', '.ops-layers', '#ops-legend'], title: 'Find the Taumoeba',
-      do: 'In the scan panel press LIFE SIGNS, then click a green hotspot ring on the map.', why: 'Taumoeba cluster in hotspots. Each one has an altitude band where they live.',
-      when: (c) => c.scene === 'planet' && c.st.ship.planetId === AD && adrian(c.st).scanLevel >= 2 && !gotTaumoeba(c.st), scene: ['planet'],
-      done: (c) => !!c.flags.hotspot || !!c.st.sampling, target: () => $('ops-layer-life') },
-    { id: 'sample', clear: ['#ops-samp', '#ops-map', '#ops-btns'], title: 'Take a sample with the tether probe',
-      do: 'Press SAMPLE, then hold SPACE to lower the chain into the green band. Release to hold, R to reel in. Keep it in the band until the sample meter fills.',
-      why: 'Tension climbs with depth and gusts; heat climbs fast below the band. A snapped or burned chain costs hull and a day, and you can retry.',
-      when: (c) => c.scene === 'planet' && c.st.ship.planetId === AD && adrian(c.st).scanLevel >= 2 && !gotTaumoeba(c.st) && (!!c.flags.hotspot || !!c.st.sampling), scene: ['planet'],
-      done: (c) => gotTaumoeba(c.st), target: () => vis('#ops-samp') || $('ops-sample') },
-    { id: 'follow', clear: ['#ops-btns'], title: 'Follow the ship',
-      do: 'Press F to switch between the chase camera and the free orbit camera. Drag to look around, wheel for distance.', why: 'In orbit the camera follows the Hail Mary by default.',
-      when: (c) => c.scene === 'planet' && c.st.ship.planetId === c.selected, scene: ['planet'], target: () => $('ops-follow') },
-
-    // ---- stage 2: breed ----
-    { id: 'go-lab', clear: ['#tabs'], title: 'Breed it tougher',
-      do: 'Press LAB (or key 3).', why: 'Wild Taumoeba dies in a star\'s nitrogen-rich air. You need a strain that tolerates 90%.',
-      when: (c) => c.st.lab.strains.length > 0 && c.st.lab.bestTolerance < 0.9 && c.scene !== 'lab' && c.st.lab.generations === 0, 
-      done: (c) => c.scene === 'lab', target: () => vis('#tabs [data-scene="lab"]') },
-    { id: 'breed', clear: ['#lab-n', '#lab-nv', '#lab-breed', '#lab-chart', '#panel-lab .strain'], title: 'Run a generation',
-      do: (c) => `Set the nitrogen slider to about ${Math.min(100, Math.round(c.st.lab.bestTolerance * 100 + 10))}%, then press BREED GENERATION. Repeat.`,
-      why: 'About 10% above your current tolerance works. Too low learns nothing, too high kills the culture. Each run costs fuel and days.',
-      when: (c) => c.scene === 'lab' && c.st.lab.strains.length > 0 && c.st.lab.generations === 0, scene: ['lab'],
-      done: (c) => c.st.lab.generations >= 1, target: () => $('lab-breed') },
-    { id: 'lab-risk', clear: ['#panel-lab .risk'], title: 'Watch the escape risk',
-      do: 'Keep an eye on the ESCAPE RISK bar.', why: 'Tougher Taumoeba may eat the hull. Rocky can craft a Xenonite lab that removes the risk.',
-      when: (c) => c.scene === 'lab' && c.st.lab.generations >= 1, scene: ['lab'], target: () => vis('#panel-lab .risk') },
-
-    // ---- BLIP-A steps (new) ----
-    { id: 'blip-intro', clear: ['#tabs'], title: 'BLIP-A: Rocky\'s ship',
-      do: 'Press BLIP-A (tab 4). Rocky\'s ship is docked to yours by the xenonite tunnel.', why: 'BLIP-A shows Rocky\'s dock state, location, missions, materials and crafting list.',
-      when: (c) => c.scene !== 'blip', target: () => vis('#panel-blip') },
-    { id: 'blip-build-lab', clear: ['#blip-craft'], title: 'Build the Xenonite lab',
-      do: 'Press BUILD on a craft recipe.', why: 'The Xenonite lab removes Taumoeba escape risk. It costs 2 minerals and 1 silicate.', when: (c) => c.scene === 'blip' && !c.st.ship.upgrades.includes('xenonite-lab'),
-      target: () => vis('#blip-craft .small:not(.on)') },
-    { id: 'blip-gather', clear: ['#blip-gather'], title: 'Send Rocky to gather',
-      do: 'Press GO on a planet to send Rocky on a gather mission.', why: 'Rocky mines materials from the planet. Lava planets give minerals, ice planets give volatiles.', when: (c) => c.scene === 'blip',
-      target: () => vis('#blip-gather .go:not([disabled])') },
-    { id: 'blip-wait', clear: ['#blip-wait'], title: 'Wait for Rocky',
-      do: 'Press WAIT FOR ROCKY to wait until his mission finishes.', why: 'When Rocky is away on a mission, use this to wait for him to return and dock automatically.', when: (c) => c.scene === 'blip' && c.st.rocky && !c.st.rocky.docked && !!c.st.rocky.mission, target: () => vis('#blip-wait') },
-
-    // ---- stage 3 and 4: deliver ----
-    { id: 'tolerance', clear: ['#tabs'], title: 'Tolerance 90%: weapon ready',
-      do: (c) => `Go to ${WORLDNAME[nextTarget(sim, c.st)]} first. Press NAV (or key 1).`, why: 'The world with the smaller countdown must be saved first.',
-      when: (c) => tolerant(c.st) && !!nextTarget(sim, c.st) && !atDest(c) && c.scene !== 'map',
-      done: (c) => c.scene === 'map' || atDest(c), target: () => vis('#tabs [data-scene="map"]') },
-    { id: 'engage', clear: ['#panel-map', '#engage', () => starEl(getStarRect((dest(ctx()) || {}).id)), () => starEl(getStarRect(ctx().st.ship.starId))], title: 'Fly there',
-      do: (c) => { const d = dest(c); return 'Click ' + (d ? d.name : 'the star') + ' on the map, then press SPIN DRIVE: ENGAGE.'; },
-      why: 'The confirm sheet shows fuel, ship years and world years before you commit. Esc or Space skips the burn animation.',
-      when: (c) => tolerant(c.st) && !!nextTarget(sim, c.st) && !atDest(c) && c.scene === 'map', scene: ['map'],
-      done: (c) => atDest(c), target: (c) => $('engage') || starEl(getStarRect((dest(c) || {}).id)) || $('map') },
-    { id: 'deliver-orbit', clear: ['#panel-system', '#panel-planet:not(.hidden)'], title: 'Enter orbit',
-      do: (c) => { const p = destPlanet(c); return 'Click ' + (p ? p.name : 'the world') + ', then press FLY TO ORBIT.'; },
-      why: 'Taumoeba must be released from orbit. Open SYSTEM (2) if you are not there.',
-      when: (c) => tolerant(c.st) && atDest(c) && c.st.ship.planetId !== (destPlanet(c) || {}).id && inSys(c), scene: ['system', 'planet'],
-      done: (c) => c.st.ship.planetId === (destPlanet(c) || {}).id,
-      target: (c) => vis('[data-a="hop"]') || vis('#panel-system [data-p="' + (destPlanet(c) || {}).id + '"]') },
-    { id: 'deliver', clear: ['#panel-system'], title: 'Release the Taumoeba',
-      do: 'Press RELEASE TAUMOEBA.', why: 'The Astrophage there will start to recede and the countdown stops falling.',
-      when: (c) => tolerant(c.st) && atDest(c) && c.st.ship.planetId === (destPlanet(c) || {}).id && c.scene === 'system', scene: ['system'],
-      done: (c) => !!c.st.delivered[c.st.ship.starId], target: () => vis('#panel-system [data-d="deliver"]') },
-    { id: 'first-delivery', title: 'It worked',
-      do: (c) => (c.st.delivered.sol && c.st.delivered.eri40 ? 'Both worlds are safe.' : c.st.delivered.eri40 ? 'One world down. Now take it to Sol.' : 'One world down. Now take it to 40 Eridani.'),
-      why: 'Follow the OBJECTIVE bar for the last trip.', when: (c) => (c.st.delivered.sol || c.st.delivered.eri40) && c.st.status === 'playing' },
-
-    // ---- explanations that fire after something happened ----
-    { id: 'relativity', clear: [block('h-world'), block('h-ship')], title: 'Two clocks',
-      do: 'WORLD clock is time at home; SHIP clock is how long you age.', why: 'Going fast makes your clock slower. A long jump costs you less than it costs them, and Astrophage grows during all of it.',
-      when: (c) => c.flags.travel, target: block('h-world') },
-    { id: 'costs', clear: [block('h-fuel')], title: 'Everything costs something',
-      do: 'Read the cost under each button before pressing it.', why: 'In-system hops burn a few hundred kg. Scans, sampling, talking and breeding each burn a little fuel and a few days.',
-      when: (c) => c.st.ship.fuelKg < c.st.ship.fuelMaxKg - 100 && c.seen.weapon, target: block('h-fuel') },
-    { id: 'irony', clear: [block('h-fuel')], title: 'Infected stars are fuel mines',
-      do: 'The more Astrophage a star has, the more fuel you can harvest per day. The thing killing Earth is also what fills your tanks.', why: 'Tau Ceti is barely infected, so it is safe but yields little. A badly infected star pays far more.',
-      when: (c) => c.flags.harvest, target: block('h-fuel') },
-    { id: 'orbit-here', clear: [block('h-loc')], title: 'You are in orbit',
-      do: 'Your orbit shows under POSITION in the top bar and as a marker in the system view.', why: 'Sampling and releasing only work while you orbit the right planet. Leaving the system resets you to parking orbit.',
-      when: (c) => c.flags.hop, target: block('h-loc') },
+    { id: 'welcome', title: 'Prologue',
+      do: 'Astrophage eats the stars. Save Earth and Erid. Rocky built a xenonite lab on the way.',
+      why: 'No escape risk in the prologue.',
+      when: (c) => stepOf(c.st) === 'scan' && !store.seen.welcome,
+      target: () => $('h-earth-b') },
+    { id: 'scan', title: 'Scan Adrian',
+      do: (c) => inSys(c) ? 'Press SCAN, then hold SPACE to sweep (3× faster here).' : 'Open SYSTEM (2), select Adrian, then press SCAN.',
+      why: 'A full sweep reveals the Taumoeba.',
+      when: onStep('scan'), done: leftStep('scan'),
+      target: (c) => vis('[data-a="scan"]') || vis('#ops-scan') || vis('#tabs [data-scene="system"]') },
+    { id: 'sample', title: 'Take a sample',
+      do: 'LIFE SIGNS → click a green hotspot → SAMPLE. Hold SPACE in the band; R to reel in.',
+      why: 'Fill the sample meter to seed the strain.',
+      when: onStep('sample'), done: leftStep('sample'),
+      target: () => vis('#ops-layer-life') || vis('#ops-sample') || vis('#ops-samp') || vis('#tabs [data-scene="planet"]'),
+      clear: ['#ops-map'] },
+    { id: 'breed', title: 'Breed the strain',
+      do: 'LAB (3): pick NITROGEN, press BREED until both bars are covered.',
+      why: 'Sol and Erid need only nitrogen here.',
+      when: onStep('breed'), done: leftStep('breed'),
+      target: () => vis('#lab-breed') || vis('#tabs [data-scene="lab"]'),
+      clear: ['#lab-focus', '.strain-card', '#lab-chart'] },
+    { id: 'beetle', title: 'Send a Beetle to Sol',
+      do: 'NAV (1): select Sol → LAUNCH BEETLE. It costs nothing and flies at 0.99c.',
+      why: 'The probe saves Earth on arrival.',
+      when: onStep('beetle'), done: leftStep('beetle'),
+      target: () => vis('#map-launch-beetle') || starEl(getStarRect('sol')) || vis('#tabs [data-scene="map"]') },
+    { id: 'jump', title: 'Jump to 40 Eridani',
+      do: 'NAV (1): select 40 Eridani → SPIN DRIVE: ENGAGE.',
+      why: 'You must deliver Erid’s strain in person.',
+      when: onStep('jump'), done: leftStep('jump'),
+      target: (c) => $('engage') || starEl(getStarRect('eri40')) || vis('#tabs [data-scene="map"]'),
+      clear: ['#panel-map'] },
+    { id: 'deliver', title: 'Deliver at Erid',
+      do: 'LAB (3): DELIVER HERE.',
+      why: 'Erid is saved; the Beetle handles Earth.',
+      when: onStep('deliver'), done: leftStep('deliver'),
+      target: () => vis('#lab-deliver') || vis('#tabs [data-scene="lab"]') },
+    { id: 'done', title: 'Prologue complete',
+      do: 'Both worlds are safe. Act II begins now — the Beetle is guaranteed to reach Sol.',
+      when: onStep('done'), target: () => $('objective') },
   ];
 
   function ctx() { return { st: getState(), scene: getScene(), flags, seen: store.seen, selected: getSelected(), mapSelected: getMapSelected() }; }
