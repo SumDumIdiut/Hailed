@@ -5,7 +5,7 @@ import { settings, setVolume, setMute, toggleMute, onChange } from './bus.js';
 const ICON = (muted) => `<svg viewBox="0 0 20 16" width="18" height="14" aria-hidden="true" style="vertical-align:-2px"><path d="M1 5h3.5L9 1.5v13L4.5 11H1z" fill="currentColor"/>` +
   (muted ? '<path d="M12 5l6 6M18 5l-6 6" stroke="currentColor" stroke-width="1.8" fill="none"/>' :
     '<path d="M12 5.2a4 4 0 0 1 0 5.6M14.6 3a7.4 7.4 0 0 1 0 10" stroke="currentColor" stroke-width="1.5" fill="none"/>') + '</svg>';
-const ROWS = [['voice', 'Rocky\'s voice']];   // music and effects were removed; only the voice remains
+const ROWS = [['music', 'Music'], ['voice', 'Rocky\'s voice']];
 let pop = null, hudBtn = null, titleBtn = null, toastT = 0;
 
 function build() {

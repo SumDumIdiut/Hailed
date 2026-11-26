@@ -294,7 +294,7 @@ function newGame(sceneName, opts = {}) {
     ? { kicker: 'ACT I · PROLOGUE', title: 'HAIL MARY', subtitle: 'Find the microbe that eats Astrophage. Save Earth and Erid.' }
     : (s.campaign && s.campaign.pendingCard) || { kicker: 'ACT II', title: 'THE SPREAD', subtitle: 'The stars are dimming. You are the last ship.' };
   if (s.campaign) s.campaign.pendingCard = null;
-  actCard(card);   // not awaited: the tutorial starts underneath
+  actCard(card); music.stinger('act');   // not awaited: the tutorial starts underneath
 } // the prologue replays its tutorial; a skip lands in Act II with its own card
 function continueGame() {
   try {
@@ -331,7 +331,7 @@ $('btn-endless').addEventListener('click', () => {
   const s = sim.startEndless(Date.now() & 0xffff);
   if (s.campaign && s.campaign.pendingCard) s.campaign.pendingCard = null;   // our own card below
   startGame(s, 'map'); save();
-  actCard({ kicker: 'ENDLESS', title: 'PETROVA FRONT', subtitle: 'Hold the line as long as you can.' });
+  actCard({ kicker: 'ENDLESS', title: 'PETROVA FRONT', subtitle: 'Hold the line as long as you can.' }); music.stinger('act');
 });
 $('btn-quit').addEventListener('click', quit);
 
@@ -352,6 +352,7 @@ function toTitle() {
   $('btn-continue').disabled = !hasSave();
   refreshEndlessLabel();
   $('title').classList.remove('hidden');
+  music.setScene('title');
 }
 $('btn-menu').addEventListener('click', () => setPaused(true));
 $('p-resume').addEventListener('click', () => setPaused(false));
@@ -366,6 +367,7 @@ $('btn-tut').addEventListener('click', () => {
 });
 $('m-btn').addEventListener('click', () => newGame('map'));
 $('btn-continue').disabled = !hasSave();
+music.setScene('title');   // title music; starts on the first click/key (audio unlock)
 
 if (params.get('autostart') === '1') {
   const want = params.get('scene') || 'map';
@@ -448,7 +450,7 @@ function frame(now) {
   if (state.campaign && state.campaign.pendingCard) {
     const card = state.campaign.pendingCard;
     state.campaign.pendingCard = null;
-    actCard(card); save();
+    actCard(card); music.stinger('act'); save();
   }
   if (scene === 'map') { P.b('map'); mapView.draw(state, t); P.e('map'); }
   else if (renderer) {

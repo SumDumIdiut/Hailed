@@ -1,0 +1,12 @@
+Write src/sim/economy.js for the game "Hailed": station markets for a space-trading game. Pure ES module, no DOM, no Math.random (use the rng passed in, or createRng from './rng.js' seeded from the seed argument; createRng(seed) returns an object with next() -> [0,1), range(a,b), int(a,b), pick(arr)). Every number stored in a market must be JSON-safe; keep demand rounded to 3 decimals.
+
+The exact contract is the test file tests/economy.test.js (pasted below as context). Exports:
+
+- createMarket(seed, resources) -> { stock: {id: int >= 0}, demand: {id: number 0.5..1.8} } for every resource in the array (resources are { id, value, mass }). Deterministic for the seed: use createRng(seed) and draw in resource order. Stock: rng int 0..40 scaled down for valuable items (value >= 150: 0..4). Demand: 0.6..1.6.
+- price(market, res, side) -> integer >= 1. base = res.value * market.demand[res.id]; buy = ceil(base * 1.12), sell = max(1, floor(base * 0.88)). So buy > sell always (if they would be equal, add 1 to buy).
+- trade(ship, market, res, qty, side) where ship = { credits, cargo: {id: n}, cargoCap } (cargo capacity in mass units). Returns { ok: true, total } or { ok: false, why } and must change NOTHING when it refuses.
+  * buy: why contains "stock" if market.stock < qty; "cargo" if cargoMass(ship.cargo)+qty*res.mass > cargoCap; "credit" if not enough credits. Buy units one at a time: price each unit at the current demand, then raise demand by 1.5% per unit (cap 1.8); total = sum. Then subtract credits, add cargo, subtract stock.
+  * sell: why contains "have" if ship.cargo[res.id] < qty. Sell one at a time: price each unit then lower demand by 2% per unit (floor 0.5); add credits, remove cargo (delete the key when it reaches 0), add stock.
+  Resource masses for cargoMass inside trade: use res.mass for the traded item and assume mass 1 for other cargo ids unless a third map argument is given — simpler: export a module-level helper that takes the byId map, and in trade compute current mass as sum over ship.cargo of (n * (id === res.id ? res.mass : (ship.massOf && ship.massOf[id]) ?? 1)).
+- driftMarket(market, years, rng): for each id: demand moves toward 1 by (1 - exp(-years)) of the gap, plus a small rng jitter ±0.03, clamped 0.5..1.8, rounded to 3 decimals; stock += round(years * 6 * rng.next()) + (stock === 0 ? 1 : 0). Iterate ids in Object.keys order.
+- cargoMass(cargo, byId) -> sum(n * byId[id].mass) (unknown ids count mass 1); cargoSpace(ship, byId) -> ship.cargoCap - cargoMass(ship.cargo, byId).
