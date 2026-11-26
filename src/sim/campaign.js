@@ -119,6 +119,8 @@ export function advanceAct(state) {
   if (state.status !== 'playing' || c.mode === 'endless') return false;
   if (c.act === 1) {
     c.act = 2;
+    // Act I's deliveries already host Taumoeba: they count as saved (immune to spread and event spores).
+    for (const id of ['sol', 'eri40']) { const s = (state.stars || []).find((x) => x.id === id); if (s && state.delivered?.[id]) s.saved = true; }
     seedAct2(state, c);
     c.pendingCard = { kicker: 'ACT II', title: 'THE SPREAD', subtitle: 'Astrophage has found a hundred more worlds. Save what you can.' };
     refreshBoard(state);

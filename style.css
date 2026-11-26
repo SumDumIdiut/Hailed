@@ -293,6 +293,18 @@ table.jt td.bad{color:var(--red)}
 .jtrack i.on{background:var(--acc)}
 .jtrack i.mid{background:#3b485c}
 .jfoot{display:flex;justify-content:space-between;margin-top:7px;font:700 10px var(--cond);letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+/* ── jump flight: two-clock readout + star streaks (cinematic) ── */
+.jclocks{display:flex;gap:clamp(14px,3vw,34px);align-items:baseline;justify-content:center;flex-wrap:wrap;margin:4px 0 10px;}
+.jclock{font:600 12px var(--mono);color:var(--dim);letter-spacing:.12em;text-transform:uppercase;}
+.jclock .v{display:block;font-variant-numeric:tabular-nums;font:700 clamp(28px,5vw,48px)/1 var(--cond);color:var(--hi);}
+.jclock .v.jnum{min-width:120px;text-align:center;}
+.jclock:last-child .v{color:var(--acc);font-size:clamp(15px,1.4vw,19px);}
+.jstreaks{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.jstreaks i{position:absolute;width:min(30vw,140px);height:1px;background:var(--acc);
+  transform:translate(-50%,-50%) rotate(var(--a,0deg)) scale(var(--amp,0));opacity:0;transition:opacity .4s ease-out;}
+@media (prefers-reduced-motion: reduce){
+  .jstreaks i{transition:none;}
+}
 
 /* ---- screens: title + end-of-game modal ---- */
 .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:30;pointer-events:auto;background:rgba(2,4,8,.9)}

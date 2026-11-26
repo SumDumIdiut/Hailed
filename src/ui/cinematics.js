@@ -2,7 +2,7 @@
    Full-screen effects that respect prefers-reduced-motion.
    pointer-events: none unless a card is actively showing. */
 
-const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ----- shared DOM -----
 const head = document.querySelector('head');
@@ -186,6 +186,13 @@ export function actCard({ kicker, title, subtitle, ms = 3600 }) {
     // auto-resolve
     actCardTimer = setTimeout(done, ms);
   });
+}
+
+// ── delivery card (Act I / Act II+ strain deliveries) ──
+export function deliveryCard({ star, strain }) {
+  actCard({ kicker: 'STRAIN DELIVERED', title: star || 'A world',
+    subtitle: `${strain || 'Taumoeba'} is hunting Astrophage.`, ms: 4000 });
+  flash('#dff6ff');
 }
 
 // ── letterbox ──

@@ -16,7 +16,7 @@ import { createEventCard } from './ui/eventcard.js';
 import { createTech } from './ui/techui.js';
 import { createBoard } from './ui/board.js';
 import { sfx, music, bus as audioBus } from './audio/index.js';
-import { actCard, fadeTo } from './ui/cinematics.js';
+import { actCard, fadeTo, deliveryCard } from './ui/cinematics.js';
 
 const SAVE_KEY = 'hailed-save';
 const IDLE_DRIFT = 0.02;          // world years per real second in the system scene; 0 disables
@@ -77,7 +77,21 @@ function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (_) 
 function afterAction(text, bad) {
   if (text) toast(text, bad);
   save(); hud.update(state); hud.renderLog(state); objective.update(state); checkEnd(); tutorial.update();
+  if (text && !bad) notifyDelivered(text);
 }
+// Delivery cinematic: Act I's sim.deliver returns "Taumoeba released at <star>."; Act II+'s
+// deliverStrain returns "Strain <label> saved <star>. Astrophage recedes; ...".
+function notifyDelivered(text) {
+  const m = /^(?:Taumoeba released at (.*?)\.|Strain (.+?) saved (.*?)\.)/.exec(text || '');
+  if (!m) return;
+  if (!state || state.status !== 'playing') return;
+  deliveryCard({ star: m[3] || m[1] || currentStar().name, strain: m[2] || 'Taumoeba' });
+}
+// The Act I tutorial belongs to a fresh Act I game only: not on endless runs or on games past Act I.
+const pastTutorial = (s) => {
+  const c = s && s.campaign;
+  return !!c && (c.act >= 2 || c.mode === 'endless');
+};
 function checkEnd() {
   if (!state || ended || state.status === 'playing') return;
   ended = true;
@@ -257,12 +271,17 @@ function startGame(s, sceneName) {
   setScene(sceneName || 'map');
 }
 function newGame(sceneName) {
-  tutorial.replay(); const s = sim.createGame(1); startGame(s, sceneName); save();
+  const s = sim.createGame(1);
+  if (!pastTutorial(s)) tutorial.replay();
+  startGame(s, sceneName); save();
   actCard({ kicker: 'ACT I', title: 'HAIL MARY', subtitle: 'The stars are dimming. You are the last ship.' });   // not awaited: the tutorial starts underneath
-} // a new game always replays the tutorial
+} // a new game only replays the tutorial when it is still Act I of the campaign
 function continueGame() {
-  try { startGame(sim.deserialize(localStorage.getItem(SAVE_KEY)), 'map'); }
-  catch (e) { console.error(e); toast('Save is unreadable.', true); }
+  try {
+    const s = sim.deserialize(localStorage.getItem(SAVE_KEY));
+    if (!pastTutorial(s)) tutorial.replay();
+    startGame(s, 'map');
+  } catch (e) { console.error(e); toast('Save is unreadable.', true); }
 }
 function quit() {
   let done = false;

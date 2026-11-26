@@ -1,5 +1,6 @@
 import { $, esc, fmt } from './util.js';
 import { sfx, music } from '../audio/index.js';
+import { letterbox, flash, REDUCED } from './cinematics.js';
 
 // Travel sequences. Interstellar: confirm sheet with the forecast, then spool-up, burn, flip, brake, arrival (about 5.5 s).
 // In-system transfer: no confirm (the cost is on the button), same sequence at about 2.7 s.
@@ -84,8 +85,14 @@ export function createJump(api) {
     run = { ...ctx, phases, total: phases.reduce((s, p) => s + p[1], 0), t0: performance.now() };
     ctx = null;
     root.classList.toggle('hop', hopMode);
+    const starJump = !hopMode;
     const title = hopMode ? `Transfer burn: orbit ${esc(run.planet.name)}` : `Spin drive: ${esc(run.from.name)} &rarr; ${esc(run.to.name)}`;
     fl.innerHTML = `<div class="jhead"><span>${title}</span><span>Esc / Space: skip to arrival</span></div><div class="jbody">
+      ${starJump ? `<div class="jclocks">
+        <div class="jclock"><span class="k">SHIP</span><span class="v jnum" data-e="jship"></span></div>
+        <div class="jclock"><span class="k">WORLD</span><span class="v jnum" data-e="jworld"></span></div>
+        <div class="jclock"><span class="k">VELOCITY</span><span class="v jnum" data-e="jvel"></span></div>
+      </div>` : ''}
       <div class="jphase"><span class="ph" data-e="ph"></span><span class="cd" data-e="cd"></span></div>
       <div class="jgrid"><div><span class="k">Velocity</span><span class="v" data-e="vel"></span></div>
         <div><span class="k">${hopMode ? 'Accel' : 'Lorentz gamma'}</span><span class="v" data-e="gam"></span></div>
@@ -101,8 +108,27 @@ export function createJump(api) {
     els.cells = [...fl.querySelectorAll('.jtrack i')];
     els.cells[Math.floor(TRACK / 2) - 1].classList.add('mid');
     show('flight');
+    if (starJump) {
+      letterbox(true);
+      run.streaks = makeStreaks(fl);
+    }
     music.jumpStart(run.total, run.kind);
     cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+  }
+
+  // Subtle star-streak effect: ~60 thin radial lines from the centre, scaling outward (transform/opacity only), made once.
+  function makeStreaks(host) {
+    let s = host.querySelector('.jstreaks');
+    if (!s) {
+      s = document.createElement('div'); s.className = 'jstreaks';
+      for (let i = 0; i < 60; i++) {
+        const d = document.createElement('i');
+        d.style.setProperty('--a', String((i * 360) / 60) + 'deg');
+        s.appendChild(d);
+      }
+      host.appendChild(s);
+    }
+    return [...s.children];
   }
 
   // Everything the display needs at elapsed seconds e: fractions of ship time / world time / distance and instruments.
@@ -157,6 +183,20 @@ export function createJump(api) {
       T.el.textContent = fmt(dShip, 2) + ' yr';
       T.dship.textContent = '+' + fmt(dShip, 2) + ' yr'; T.dworld.textContent = '+' + fmt(dWorld, 2) + ' yr';
     }
+    // interstellar two-clock readout: SHIP/WORLD counting up to the trip values (time dilation), velocity climbing and back.
+    if (kind === 'star') {
+      const trip = run.trip;
+      if (T.jship) T.jship.textContent = fmt(o.sf * trip.shipYears, 2) + ' yr';
+      if (T.jworld) T.jworld.textContent = fmt(o.wf * trip.worldYears, 2) + ' yr';
+      if (T.jvel) T.jvel.textContent = fmt(o.vel, 2) + ' c';
+      if (run.streaks && !REDUCED) {
+        const amp = 0.3 + 0.45 * Math.min(1, Math.max(0, o.vel));
+        run.streaks.forEach((str, i) => {
+          str.style.setProperty('--amp', String(amp));
+          str.style.opacity = String(0.04 + 0.13 * amp + 0.02 * (i % 7));
+        });
+      }
+    }
     T.dfuel.textContent = '-' + Math.round((b.fuelKg - a.fuelKg) * o.sf) + ' kg';
     const hud = api.hudValues();
     T.ee.textContent = `${fmt(hud.earth, 1)} / ${fmt(hud.erid, 1)} yr`;
@@ -175,6 +215,10 @@ export function createJump(api) {
     const st = api.state();
     const result = r.kind === 'star' ? sim.travel(st, r.id) : sim.travelToPlanet(st, r.id);
     api.done(r.kind, r.id, result, r);
+    if (r.kind === 'star') {
+      if (r.streaks) r.streaks.forEach((e) => { e.style.opacity = '0'; });   // arrival
+      flash(); letterbox(false);
+    }
   }
 
   // Esc / Space / Enter while a sheet or sequence is up. Returns true if it consumed the key.

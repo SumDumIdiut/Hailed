@@ -131,7 +131,10 @@ function applyEffect(state, fx, ctx, tick, out) {
   if (fx.infection !== undefined) {
     const id = !fx.star || fx.star === 'here' ? state.ship.starId : fx.star;
     const star = findStar(state, id);
-    if (star) {
+    // Saved stars (and Act I deliveries) host Taumoeba: event spores cannot take hold there.
+    if (star && num(fx.infection) > 0 && (star.saved || state.delivered?.[star.id])) {
+      out.push(`${star.name}'s Taumoeba bloom shrugs off the spores.`);
+    } else if (star) {
       const before = clamp(num(star.infection), 0, 1);
       const after = clamp(before + num(fx.infection), 0, 1);
       star.infection = after;

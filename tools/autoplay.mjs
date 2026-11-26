@@ -591,7 +591,7 @@ function main() {
       ` worldYears=${r.worldYears.toFixed(1)} actions=${r.actions} real=${r.hours.toFixed(2)}h` +
       ` events=${r.eventsSeen.unique}/${r.eventsSeen.resolved} techs=${r.techsBought} beetles=${r.launches}` +
       ` act2=${r.act2Actions ?? '-' } act3=${r.act3Actions ?? '-'}` +
-      ` stuck=${r.stuck ? `YES ${r.stuckReason}` : 'no'}`
+      ` stuck=${r.stuck ? `YES ${r.stuckReason}` : 'no'}` + (r.outcome === 'lost' ? `\n    lost: ${r.statusText}` : '')
     );
   }
   const wins = reports.filter((r) => r.outcome === 'won').length;
