@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame } from '../src/sim/index.js';
+import * as S from '../src/sim/index.js';
 import { BIOSPHERE, MAX_STRAINS, biosphereProfile, newStrain, breed, coverage, canSave, nameStrain } from '../src/sim/genetics.js';
 import { BEETLE_COST, launchBeetle, beetleTick } from '../src/sim/beetles.js';
 import { findStar, starDistance } from '../src/sim/stars.js';
 
 const star = (g, id) => g.stars.find((s) => s.id === id);
+// These lab/beetle tests exercise legacy rules: no prologue, no free lab.
+const createGame = (seed) => S.createGame(seed, { legacyActI: true });
 
 // A strain with the given nitrogen level and otherwise-tolerant traits.
 function mkStrainGame(g, nitrogen) {

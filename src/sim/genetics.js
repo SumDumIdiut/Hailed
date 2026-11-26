@@ -7,6 +7,7 @@ import { addLog, spendTime } from './util.js';
 import { COSTS } from './ship.js';
 import { effectMul } from './tech.js';
 import { drawEvent } from './events.js';
+import { isPrologue, prologueProfile, prologueBreedPush } from './prologue.js';
 
 export const TRAITS = ['nitrogen', 'co2', 'cold', 'heat', 'radiation', 'vigor'];
 export const BIOSPHERE = ['nitrogen', 'co2', 'cold', 'heat', 'radiation'];   // the atmospheric traits a strain must cover
@@ -23,7 +24,13 @@ export function geneticsOf(state) {
 
 // Deterministic biosphere requirements for a star (0..1, capped at 0.95): from its spectral class, its
 // planets' atmospheres, and the world's own flavour (Erid's ammonia-rich air, Sol's nitrogen).
-export function biosphereProfile(star) {
+export function biosphereProfile(star, state) {
+  // The prologue simplifies only the two teaching targets; pass state from delivery
+  // and beetle paths so they check the same requirement the UI shows.
+  if (state && isPrologue(state)) {
+    const pro = prologueProfile(star);
+    if (pro) return pro;
+  }
   const types = new Set((star.planets || []).map((p) => p.type));
   const scorching = (star.planets || []).some((p) => (p.type === 'lava' || p.type === 'desert') && (p.atmo?.density || 0) > 0.85);
   const icy = types.has('ice');
@@ -97,7 +104,7 @@ export function breed(state, { focus, pressure, strainId } = {}, tickFn = tick) 
   const parent = strains.find((s) => s.id === (strainId || g.best)) || strains.find((s) => s.id === g.best) || strains[strains.length - 1];
   const rng = stateRng(state);
   const vigor = clamp01(parent.traits?.vigor ?? 0.5);
-  const push = (0.025 + 0.1 * p) * (0.7 + 0.3 * vigor);
+  const push = isPrologue(state) ? prologueBreedPush(p) : (0.025 + 0.1 * p) * (0.7 + 0.3 * vigor);
   const traits = { ...parent.traits };
   traits[focusT] = +clamp01((traits[focusT] ?? 0) + push + rng.range(0, 0.01)).toFixed(4);
   for (const t of TRAITS) {
@@ -131,4 +138,18 @@ export function nameStrain(state, id, name) {
   if (!s) return null;
   s.name = String(name ?? '').trim().slice(0, 24);
   return s;
+}
+
+// The first successful sample of Adrian names a genetics culture, so the prologue can
+// teach the modern lab instead of the old single nitrogen tolerance. Idempotent: every
+// sampling path (instant, tether, endSample cleanup) can call it safely.
+export function ensurePrologueSampleStrain(state) {
+  if (!isPrologue(state)) return null;
+  const g = geneticsOf(state);
+  if (g.strains.some((s) => s.name === 'Taumoeba')) return null;
+  const strain = newStrain(state);
+  nameStrain(state, strain.id, 'Taumoeba');
+  g.best = strain.id;
+  addLog(state, `The sample yields a pure Taumoeba culture. The lab names it ${strain.name}.`);
+  return strain;
 }

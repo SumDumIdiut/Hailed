@@ -5,6 +5,7 @@ import { addLog } from './util.js';
 import { canSave, coverage, biosphereProfile, geneticsOf } from './genetics.js';
 import { effectMul } from './tech.js';
 import { drawEvent } from './events.js';
+import { isPrologue } from './prologue.js';
 
 export const BEETLE_COST = { fuelKg: 600, materials: { minerals: 2, silicates: 1 } };
 export const BEETLE_SPEED = 0.9;                   // ly per world year before probe techs
@@ -31,12 +32,15 @@ export function launchBeetle(state, strainId, toStarId) {
   const to = findStar(state, toStarId);
   if (!to) return bad('Unknown star.');
   const have = state.rocky ? state.rocky.materials : null;
-  const cost = beetleCost(state);
+  const prologue = isPrologue(state);
+  // Rocky hands the tutorial courier over for free, and it runs at 0.99c so Sol is
+  // reached inside the prologue instead of a decade later.
+  const cost = prologue ? { fuelKg: 0, materials: { minerals: 0, silicates: 0 } } : beetleCost(state);
   const need = cost.materials;
   const fuelCost = cost.fuelKg;
-  const speed = BEETLE_SPEED * Math.max(1, effectMul(state, 'beetleSpeedMul'));
-  if ((state.ship.fuelKg ?? 0) < fuelCost) return bad(`Not enough Astrophage fuel: the probe burns ${fuelCost} kg to leave.`);
-  if (!have || (have.minerals || 0) < need.minerals || (have.silicates || 0) < need.silicates) {
+  const speed = prologue ? 0.99 : BEETLE_SPEED * Math.max(1, effectMul(state, 'beetleSpeedMul'));
+  if (!prologue && (state.ship.fuelKg ?? 0) < fuelCost) return bad(`Not enough Astrophage fuel: the probe burns ${fuelCost} kg to leave.`);
+  if (!prologue && (!have || (have.minerals || 0) < need.minerals || (have.silicates || 0) < need.silicates)) {
     return bad(`Rocky must bring the xenonite parts: the probe needs ${need.minerals} minerals and ${need.silicates} silicates.`);
   }
   const from = findStar(state, state.ship.starId);
@@ -70,14 +74,17 @@ export function beetleTick(state) {
     b.status = 'arrived';
     const star = findStar(state, b.to);
     const strain = b.strainData || (g.strains || []).find((s) => s.id === b.strainId);
-    const profile = star ? biosphereProfile(star) : null;
+    const prologue = isPrologue(state);
+    const profile = star ? biosphereProfile(star, state) : null;
     const cov = strain && profile ? coverage(strain, profile) : 0;
-    const ok = canSave(strain, profile);
+    // The tutorial courier is guaranteed to make it: Rocky vetted the culture before launch.
+    const ok = !!star && (prologue && b.to === 'sol' ? true : canSave(strain, profile));
     let short = null;
     if (ok) {
       star.saved = true;
       star.infection = Math.max(0, star.infection - 0.5);
       state.research = (state.research ?? 0) + 3;
+      if (prologue && b.to === 'sol') state.delivered.sol = true;
       addLog(state, `Beetle probe ${b.id} delivered strain ${strain.name || strain.id} to ${star.name}: the strain covers the biosphere. Astrophage recedes.`);
     } else if (strain && profile) {
       short = ['nitrogen', 'co2', 'cold', 'heat', 'radiation']

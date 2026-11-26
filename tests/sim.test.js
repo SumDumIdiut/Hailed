@@ -7,6 +7,11 @@ const isRGB = (c) => Array.isArray(c) && c.length === 3 && c.every((v) => v >= 0
 const orbit = (g, id) => { assert.ok(S.travelToPlanet(g, id).ok, 'orbit ' + id); };
 const star = (g, id) => g.stars.find((s) => s.id === id);
 
+// These are the ORIGINAL Act I tests. They build the old-style start (ship parked at
+// Tau Ceti, no prologue flag, xenonite lab not yet built) so they keep covering the
+// legacy tutorial path; the new prologue is covered in tests/prologue.test.js.
+const createGame = (seed, opts = {}) => S.createGame(seed, { legacyActI: true, ...opts });
+
 // Rocky crafts the xenonite lab (the starting materials cover it exactly), then sample Adrian.
 function winSetup(g) {
   assert.ok(S.craft(g, 'xenonite-lab').ok, 'craft the xenonite lab');
@@ -26,9 +31,9 @@ function breedUp(g) {
 }
 
 test('determinism and catalog shape', () => {
-  assert.equal(S.serialize(S.createGame(7)), S.serialize(S.createGame(7)));
-  assert.notEqual(S.serialize(S.createGame(7)), S.serialize(S.createGame(8)));
-  const g = S.createGame(3);
+  assert.equal(S.serialize(createGame(7)), S.serialize(createGame(7)));
+  assert.notEqual(S.serialize(createGame(7)), S.serialize(createGame(8)));
+  const g = createGame(3);
   assert.equal(g.stars.length, 60);                       // 12 catalog stars + 48 expansion stars
   assert.equal(g.stars.filter((s) => !s.id.startsWith('g-')).length, 12);
   assert.equal(g.ship.starId, 'tauceti');
@@ -58,31 +63,31 @@ test('determinism and catalog shape', () => {
 });
 
 test('logistic growth and spread', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   const s = star(g, 'eri40'), i0 = s.infection;
   S.tick(g, 5);
   assert.ok(s.infection > i0);
   assert.ok(s.lum < s.lum0);
   assert.equal(g.time.worldYears, 5);
   // spread: an uninfected far star becomes infected eventually
-  const g2 = S.createGame(1);
+  const g2 = createGame(1);
   const w = star(g2, 'wolf359'); w.infection = 0;
   for (let i = 0; i < 12 && w.infection === 0; i++) S.tick(g2, 2);
   assert.ok(w.infection > 0);
   // Tau Ceti holds steady
-  const g3 = S.createGame(1); const t = star(g3, 'tauceti');
+  const g3 = createGame(1); const t = star(g3, 'tauceti');
   S.tick(g3, 20);
   assert.ok(t.infection < 0.2 && t.infection > 0.1);
   assert.equal(S.extinctionYears(g3, 'earth') > 0, true);
 });
 
 test('extinction years and idle loss', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   const e = S.extinctionYears(g, 'erid');
   assert.ok(e > 20 && e < 40);
   assert.ok(S.extinctionYears(g, 'earth') > e);
   for (const seed of [1, 2, 3]) {
-    const h = S.createGame(seed);
+    const h = createGame(seed);
     while (h.status === 'playing') S.tick(h, 0.5);
     assert.equal(h.status, 'lost');
     assert.ok(h.time.worldYears > 20 && h.time.worldYears < 42, String(h.time.worldYears));
@@ -91,7 +96,7 @@ test('extinction years and idle loss', () => {
 });
 
 test('travel fuel and relativity', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   const plan = S.travelPlan(g, 'eri40');
   assert.ok(plan.ok && plan.shipYears < plan.worldYears && plan.worldYears > plan.distanceLy);
   const f0 = g.ship.fuelKg;
@@ -109,13 +114,13 @@ test('travel fuel and relativity', () => {
   assert.equal(g.ship.starId, 'eri40');
   assert.equal(S.travelPlan(g, 'nowhere').ok, false);
   // trips per tank: 2-4 typical trips
-  const full = S.createGame(1);
+  const full = createGame(1);
   const per = 60000 / S.travelPlan(full, 'sol').fuelKg;
   assert.ok(per >= 2 && per <= 4);
 });
 
 test('breeding progress and death', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   assert.equal(S.breedStep(g, { nitrogenPct: 10 }).ok, false);
   orbit(g, 'tauceti-3'); S.scanPlanet(g, 'tauceti-3');
   assert.equal(S.samplePlanet(g, 'tauceti-3').ok, true);
@@ -126,18 +131,18 @@ test('breeding progress and death', () => {
   assert.ok(g.time.shipYears > ship0);
   assert.ok(g.lab.escapeRisk > 0);
   // too low: slow
-  const h = S.createGame(1); orbit(h, 'tauceti-3'); S.scanPlanet(h, 'tauceti-3'); S.samplePlanet(h, 'tauceti-3');
+  const h = createGame(1); orbit(h, 'tauceti-3'); S.scanPlanet(h, 'tauceti-3'); S.samplePlanet(h, 'tauceti-3');
   for (let i = 0; i < 20; i++) S.breedStep(h, { nitrogenPct: 0 });
   assert.ok(h.lab.bestTolerance < 0.4, String(h.lab.bestTolerance)); // no selection pressure: random drift only
   // too high: death
-  const d = S.createGame(1); orbit(d, 'tauceti-3'); S.scanPlanet(d, 'tauceti-3'); S.samplePlanet(d, 'tauceti-3');
+  const d = createGame(1); orbit(d, 'tauceti-3'); S.scanPlanet(d, 'tauceti-3'); S.samplePlanet(d, 'tauceti-3');
   const r = S.breedStep(d, { nitrogenPct: 90 });
   assert.equal(d.lab.strains.length, 0);
   assert.ok(/died/i.test(r.text));
 });
 
 test('breach without lab, none with xenonite-lab', () => {
-  const g = S.createGame(1); orbit(g, 'tauceti-3'); S.scanPlanet(g, 'tauceti-3'); S.samplePlanet(g, 'tauceti-3');
+  const g = createGame(1); orbit(g, 'tauceti-3'); S.scanPlanet(g, 'tauceti-3'); S.samplePlanet(g, 'tauceti-3');
   let breached = false;
   for (let k = 0; k < 40 && !breached; k++) {
     g.lab.strains = [{ id: 'x', nTolerance: 0.95, population: 500, generation: 0 }];
@@ -145,7 +150,7 @@ test('breach without lab, none with xenonite-lab', () => {
     breached = g.ship.hull < 1;
   }
   assert.ok(breached && g.lab.strains.length === 0);
-  const h = S.createGame(1); h.ship.upgrades.push('xenonite-lab');
+  const h = createGame(1); h.ship.upgrades.push('xenonite-lab');
   h.lab.strains = [{ id: 'x', nTolerance: 0.95, population: 500, generation: 0 }];
   S.breedStep(h, { nitrogenPct: 80 });
   assert.equal(h.lab.escapeRisk, 0);
@@ -154,7 +159,7 @@ test('breach without lab, none with xenonite-lab', () => {
 });
 
 test('scripted winning run', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   winSetup(g); breedUp(g);
   assert.equal(S.deliver(g).ok, false); // not at a target
   assert.ok(S.travel(g, 'eri40').ok);
@@ -178,7 +183,7 @@ test('scripted winning run', () => {
 });
 
 test('losing: wrong order is too slow, idle loses', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   winSetup(g); breedUp(g);
   while (S.extinctionYears(g, 'erid') > 13) S.tick(g, 0.25);   // dawdle at Tau Ceti until 40 Eridani is nearly gone
   S.travel(g, 'sol');
@@ -187,7 +192,7 @@ test('losing: wrong order is too slow, idle loses', () => {
 });
 
 test('save round trip', () => {
-  const g = S.createGame(5);
+  const g = createGame(5);
   winSetup(g);
   S.tick(g, 3);
   g.stars[0].infection = Infinity; // exercise non-finite handling
@@ -202,7 +207,7 @@ test('save round trip', () => {
 });
 
 test('in-system travel: plan, cost, nav discount, refusals', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   assert.equal(g.ship.planetId, null);
   const plan = S.travelToPlanetPlan(g, 'tauceti-3');
   assert.ok(plan.ok && plan.fuelKg >= 100 && plan.fuelKg <= 900, String(plan.fuelKg));
@@ -232,7 +237,7 @@ test('in-system travel: plan, cost, nav discount, refusals', () => {
 });
 
 test('sampling needs orbit, scan range penalty', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   // remote scan from parking orbit: works, but no Taumoeba and not enough for a sample
   const t0 = g.time.shipYears, f0 = g.ship.fuelKg;
   const r = S.scanPlanet(g, 'tauceti-3');
@@ -255,7 +260,7 @@ test('sampling needs orbit, scan range penalty', () => {
 });
 
 test('deliver requires orbit of Earth or Erid', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   winSetup(g); breedUp(g);
   S.travel(g, 'eri40');
   assert.ok(/orbit/i.test(S.deliver(g).text));
@@ -266,7 +271,7 @@ test('deliver requires orbit of Earth or Erid', () => {
 });
 
 test('small actions cost ship time and fuel', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   orbit(g, 'tauceti-3'); S.scanPlanet(g, 'tauceti-3'); S.samplePlanet(g, 'tauceti-3');
   const t = g.time.shipYears, f = g.ship.fuelKg;
   const b = S.breedStep(g, { nitrogenPct: 10 });
@@ -280,7 +285,7 @@ test('small actions cost ship time and fuel', () => {
 });
 
 test('old saves migrate: eridian dropped, default rocky added, upgrades kept', () => {
-  const g = S.createGame(2);
+  const g = createGame(2);
   g.ship.upgrades.push('xenonite-lab', 'eridian-nav');
   const old = JSON.parse(S.serialize(g));
   old.state.eridian = { name: 'Rocky', met: true, trust: 0.6, said: { greet: 2 }, vocab: { fuel: { learned: true } },
@@ -288,10 +293,10 @@ test('old saves migrate: eridian dropped, default rocky added, upgrades kept', (
   delete old.state.rocky;
   const m = S.deserialize(JSON.stringify(old));
   assert.equal('eridian' in m, false);                                  // the comms system is dropped
-  assert.deepEqual(m.rocky, S.createGame(2).rocky);                     // default Rocky: docked at the ship
+  assert.deepEqual(m.rocky, createGame(2).rocky);                     // default Rocky: docked at the ship
   assert.deepEqual(m.ship.upgrades, ['xenonite-lab', 'eridian-nav']);   // kept as they were
   // a save that already has Rocky keeps him exactly as he is
-  const cur = JSON.parse(S.serialize(S.createGame(2)));
+  const cur = JSON.parse(S.serialize(createGame(2)));
   cur.state.rocky.docked = false; cur.state.rocky.materials.gas = 7; cur.state.rocky.says = { text: 'Hi', mood: 'still', worldYears: 1 };
   const k = S.deserialize(JSON.stringify(cur));
   assert.equal(k.rocky.docked, false);
@@ -304,7 +309,7 @@ const YIELDS = { rocky: { minerals: 4 }, lava: { minerals: 5 }, desert: { silica
 const BASE_MATS = { minerals: 2, volatiles: 1, gas: 0, silicates: 1 };
 
 test('dock and undock: same system, same orbit, no mission, half a day each', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   assert.ok(g.rocky.docked && g.rocky.starId === g.ship.starId && g.rocky.planetId === null);
   const w0 = g.time.worldYears, s0 = g.time.shipYears;
   assert.ok(S.undock(g).ok);
@@ -336,7 +341,7 @@ test('dock and undock: same system, same orbit, no mission, half a day each', ()
 });
 
 test('gather mission: plan, start, waitForRocky pays out and docks', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   const p2 = star(g, 'tauceti').planets.find((p) => p.id === 'tauceti-2');
   const plan = S.missionPlan(g, 'gather', 'tauceti-2');
   assert.ok(plan.ok, plan.reason);
@@ -364,7 +369,7 @@ test('gather mission: plan, start, waitForRocky pays out and docks', () => {
 });
 
 test('a gather at the Petrova planet brings Astrophage fuel', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   const tgt = S.petrovaTarget(star(g, 'tauceti').planets);
   assert.equal(tgt.id, 'tauceti-3');
   g.ship.fuelKg = 10000;
@@ -382,7 +387,7 @@ test('a gather at the Petrova planet brings Astrophage fuel', () => {
 });
 
 test('interstellar travel waits for Rocky', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   S.undock(g);                                                           // away, no mission
   let p = S.travelPlan(g, 'eri40');
   assert.equal(p.ok, false);
@@ -401,7 +406,7 @@ test('interstellar travel waits for Rocky', () => {
 });
 
 test('the Blip-A rides along on a jump', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   assert.ok(S.travel(g, 'eri40').ok);
   assert.equal(g.rocky.starId, 'eri40');
   assert.equal(g.rocky.planetId, null);
@@ -414,7 +419,7 @@ test('the Blip-A rides along on a jump', () => {
 });
 
 test('crafting: materials and days spent, effects applied, Rocky must be docked', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   const list = S.recipes(g);
   assert.deepEqual(list.map((r) => r.id), ['xenonite-lab', 'xeno-tanks', 'hull-plating', 'scoop', 'nav-link']);
   const lab = list.find((r) => r.id === 'xenonite-lab');
@@ -473,7 +478,7 @@ test('crafting: materials and days spent, effects applied, Rocky must be docked'
 });
 
 test('the xenonite-lab recipe removes the escape risk', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   g.lab.strains = [{ id: 'x', nTolerance: 0.9, population: 500, generation: 3 }];
   assert.ok(S.breedStep(g, { nitrogenPct: 50 }).ok);
   assert.ok(g.lab.strains.length, 'the culture survives this generation');
@@ -486,7 +491,7 @@ test('the xenonite-lab recipe removes the escape risk', () => {
 });
 
 test('the scoop multiplies the harvest yield by 1.6', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   orbit(g, 'tauceti-3'); g.ship.fuelKg = 5000;
   const base = S.harvestRate(star(g, 'tauceti'));
   assert.ok(Math.abs(S.harvestPlan(g, 'collector').kgPerDay - base) < 1);
@@ -501,7 +506,7 @@ test('the scoop multiplies the harvest yield by 1.6', () => {
 // ---- scan sweep, tether sampling, harvesting ----
 const AD = 'tauceti-3';
 test('scan sweep: needs orbit, costs once, 60% is a full scan, map fills in', async () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   assert.equal(S.scanBegin(g, AD).ok, false);                       // not in orbit
   orbit(g, AD);
   const f0 = g.ship.fuelKg, r = S.scanBegin(g, AD);
@@ -532,7 +537,7 @@ test('scan sweep: needs orbit, costs once, 60% is a full scan, map fills in', as
 
 test('tether sampling: gates, success, snap, burn, determinism', () => {
   const setup = () => {
-    const g = S.createGame(1); orbit(g, AD);
+    const g = createGame(1); orbit(g, AD);
     assert.equal(S.beginSample(g, AD, 'h1').ok, false);                 // not swept yet
     S.scanBegin(g, AD); S.scanProgress(g, AD, 0.5);
     assert.equal(S.beginSample(g, AD, 'h1').ok, false);                 // below 60%
@@ -576,12 +581,12 @@ test('tether sampling: gates, success, snap, burn, determinism', () => {
   for (let i = 0; i < 90; i++) { S.sampleStep(a1, { depthDelta: 0.004, dt: 1 / 30 }); S.sampleStep(a2, { depthDelta: 0.004, dt: 1 / 30 }); }
   assert.deepEqual(a1.sampling, a2.sampling);
   // the helper path
-  const h3 = S.createGame(1); orbit(h3, AD);
+  const h3 = createGame(1); orbit(h3, AD);
   assert.ok(S.autoSample(h3, AD).ok && h3.ship.samples === 1 && h3.sampling === null);
 });
 
 test('harvesting: collector at the Petrova planet, skim, yields scale with infection', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   assert.equal(S.petrovaTarget(star(g, 'tauceti').planets).id, AD);
   assert.equal(S.harvestPlan(g, 'collector').ok, false);                 // not in orbit of it
   orbit(g, AD); g.ship.fuelKg = 5000;
@@ -604,7 +609,7 @@ test('harvesting: collector at the Petrova planet, skim, yields scale with infec
   const hull = g.ship.hull; assert.ok(S.harvest(g, 'skim').ok && g.ship.hull < hull);
   g.ship.hull = 0.4; assert.equal(S.harvestPlan(g, 'skim').ok, false);
   // a barely infected star yields almost nothing
-  const h = S.createGame(1); star(h, 'tauceti').infection = 0.002; orbit(h, AD);
+  const h = createGame(1); star(h, 'tauceti').infection = 0.002; orbit(h, AD);
   assert.equal(S.harvestPlan(h, 'collector').ok, false);
   // Sol is a fuel mine as it worsens: Venus (first desert world with air) is its Petrova planet
   g.ship.hull = 1; star(g, 'sol').infection = 0.1; g.ship.fuelKg = 40000; S.travel(g, 'sol');
@@ -613,12 +618,12 @@ test('harvesting: collector at the Petrova planet, skim, yields scale with infec
 
 test('petrovaTarget matches the renderer', async () => {
   const R = await import('../src/render/index.js');
-  const g = S.createGame(3);
+  const g = createGame(3);
   for (const s of g.stars) assert.equal(S.petrovaTarget(s.planets)?.id, R.petrovaTarget(s.planets)?.id, s.id);
 });
 
 test('harvest keeps the tuned win path winnable', () => {
-  const g = S.createGame(1);
+  const g = createGame(1);
   winSetup(g); breedUp(g);
   // spend fuel down, then refuel by harvesting at Tau Ceti and still win
   g.ship.fuelKg = 3000;

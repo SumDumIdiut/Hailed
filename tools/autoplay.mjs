@@ -7,7 +7,7 @@
 // harvesting, breed toward the most threatened star's biosphere, deliver, buy tech and
 // follow the Cartographers toward the Source.
 //
-// Run: node tools/autoplay.mjs [seeds=5] [--endless]
+// Run: node tools/autoplay.mjs [seeds=5] [--endless] [--skip]
 
 import { pathToFileURL } from 'node:url';
 import * as S from '../src/sim/index.js';
@@ -137,6 +137,71 @@ function stepActOne(g, st) {
   st.actions += 1; st.delivers += 1;
   S.deliver(g);
   return true;
+}
+
+// The prologue teaching loop: scan, sample, breed, beetle, jump, deliver. prologueStep
+// names the beat, so the bot can never skip ahead or burn actions on a finished beat.
+function bestPrologueStrain(g) {
+  const profiles = [starOf(g, 'sol'), starOf(g, 'eri40')].map((s) => S.biosphereProfile(s, g));
+  const rank = (s) => Math.min(...profiles.map((p) => S.coverage(s, p)));
+  return (S.geneticsOf(g).strains || []).slice().sort((a, b) => rank(b) - rank(a))[0] || null;
+}
+
+function stepPrologue(g, st) {
+  const view = S.pendingEvent(g);
+  if (view) {
+    const idx = view.choices.findIndex((ch) => ch.ok);
+    if (idx >= 0) { st.actions += 1; st.events += 1; S.resolveChoice(g, idx); return true; }
+  }
+  const ad = planetOf(g, 'tauceti-3');
+  switch (S.prologueStep(g)) {
+    case 'scan': {
+      if (g.ship.starId !== 'tauceti') { st.actions += 1; st.jumps += 1; S.travel(g, 'tauceti'); return true; }
+      if (g.ship.planetId !== 'tauceti-3' && S.travelToPlanet(g, 'tauceti-3').ok) { st.actions += 1; return true; }
+      if (!ad || (ad.planet.scanLevel || 0) < 2) {
+        st.actions += 1; st.scans += 1;
+        const b = S.scanBegin(g, 'tauceti-3');
+        if (b.ok) S.scanProgress(g, 'tauceti-3', 1);
+        return true;
+      }
+      return false;
+    }
+    case 'sample': {
+      if (g.ship.starId !== 'tauceti') { st.actions += 1; st.jumps += 1; S.travel(g, 'tauceti'); return true; }
+      if (g.ship.planetId !== 'tauceti-3' && S.travelToPlanet(g, 'tauceti-3').ok) { st.actions += 1; return true; }
+      st.actions += 1; st.samples += 1;
+      S.autoSample(g, 'tauceti-3');
+      return true;
+    }
+    case 'breed': {
+      const strains = S.geneticsOf(g).strains || [];
+      const parent = strains.slice().sort((a, b) => (b.traits?.nitrogen ?? 0) - (a.traits?.nitrogen ?? 0))[0] || S.newStrain(g);
+      st.actions += 1; st.breeds += 1;
+      S.breed(g, { focus: 'nitrogen', pressure: 0.5, strainId: parent.id }, S.tick);
+      return true;
+    }
+    case 'beetle': {
+      const strain = bestPrologueStrain(g) || (S.geneticsOf(g).strains || [])[0];
+      if (!strain) return false;
+      st.actions += 1; st.launches += 1;
+      S.launchBeetle(g, strain.id, 'sol');
+      return true;
+    }
+    case 'jump':
+      return travelTo(g, st, 'eri40');
+    case 'deliver': {
+      if (g.ship.starId !== 'eri40') return travelTo(g, st, 'eri40');
+      // Fly to Erid itself: the delivery is the same act the player will repeat in Act II.
+      if (g.ship.planetId !== 'eri40-2' && S.travelToPlanet(g, 'eri40-2').ok) { st.actions += 1; return true; }
+      const strain = bestPrologueStrain(g);
+      if (!strain) return false;
+      st.actions += 1; st.delivers += 1;
+      S.deliverStrain(g, strain.id);
+      return true;
+    }
+    default:
+      return false;   // 'done': prologueStep has already opened Act II
+  }
 }
 
 // Ids of the newest Petrova shell (g<cycle>-<n>). Once nothing nearer is left, the
@@ -519,7 +584,7 @@ function doContract(g, st) {
 function step(g, st) {
   if (g.status !== 'playing') return false;
   const act = g.campaign?.act ?? 1;
-  if (act === 1) return stepActOne(g, st);
+  if (act === 1) return g.campaign?.prologue ? stepPrologue(g, st) : stepActOne(g, st);
 
   // resolve any pending event: first affordable choice
   const view = S.pendingEvent(g);
@@ -601,9 +666,10 @@ function step(g, st) {
 
 export function playSeed(seed, opts = {}) {
   const endless = !!opts.endless;
+  const skip = !!opts.skip;
   const maxActions = opts.maxActions ?? DEFAULT_MAX_ACTIONS;
   const maxWorldYears = opts.maxWorldYears ?? DEFAULT_MAX_WORLD_YEARS;
-  const g = endless ? S.startEndless(seed) : S.createGame(seed);
+  const g = endless ? S.startEndless(seed) : S.createGame(seed, { skipPrologue: skip });
   const st = { actions: 0, scans: 0, samples: 0, breeds: 0, delivers: 0, launches: 0, buys: 0, events: 0, harvests: 0, crafts: 0, jumps: 0, idle: 0, tech: [], beetles: [], blocked: '', work: null };
   const sigs = [];
   const actEntered = { 2: null, 3: null };
@@ -650,13 +716,14 @@ export function playSeed(seed, opts = {}) {
   const uniqueEvents = new Set();
   for (const id of Object.keys(g.events?.seen || {})) uniqueEvents.add(id);
   return {
-    seed, endless,
+    seed, endless, skip,
     outcome: g.status, statusText: g.statusText,
     act: c.act, mode: c.mode, cycle: c.cycle ?? 0,
     starsSaved: (c.saved || []).length, starsDark: (c.dark || []).length,
     stars: (g.stars || []).length,
     worldYears: g.time?.worldYears ?? 0,
     actions: st.actions, scans: st.scans, samples: st.samples, breeds: st.breeds,
+    act1Actions: actEntered[2]?.actions ?? st.actions,
     act2Actions: actEntered[3] ? actEntered[3].actions - (actEntered[2]?.actions ?? 0) : null,
     act3Actions: actEntered[3] ? st.actions - actEntered[3].actions : null,
     act2Years: actEntered[3] ? actEntered[3].years - (actEntered[2]?.years ?? 0) : null,
@@ -681,18 +748,19 @@ export function runSeeds(seedCount, opts = {}) {
 
 function main() {
   const argv = process.argv.slice(2);
-  let seeds = 5, endless = false;
+  let seeds = 5, endless = false, skip = false;
   for (const a of argv) {
     if (a === '--endless') endless = true;
+    else if (a === '--skip') skip = true;
     else { const n = Number(a); if (Number.isFinite(n) && n > 0) seeds = Math.floor(n); }
   }
-  const reports = runSeeds(seeds, { endless });
+  const reports = runSeeds(seeds, { endless, skip });
   for (const r of reports) {
     console.log(
       `seed ${String(r.seed).padStart(3, '0')} [${r.mode}]: outcome=${r.outcome} act=${r.act} cycle=${r.cycle} saved=${r.starsSaved} dark=${r.starsDark} stars=${r.stars}` +
       ` worldYears=${r.worldYears.toFixed(1)} actions=${r.actions} real=${r.hours.toFixed(2)}h` +
       ` events=${r.eventsSeen.unique}/${r.eventsSeen.resolved} techs=${r.techsBought} beetles=${r.launches}` +
-      ` act2=${r.act2Actions ?? '-' } act3=${r.act3Actions ?? '-'}` +
+      ` act1=${r.act1Actions ?? '-'} act2=${r.act2Actions ?? '-' } act3=${r.act3Actions ?? '-'}` +
       ` stuck=${r.stuck ? `YES ${r.stuckReason}` : 'no'}` + (r.outcome === 'lost' ? `\n    lost: ${r.statusText}` : '')
     );
   }
@@ -700,7 +768,7 @@ function main() {
   const losses = reports.filter((r) => r.outcome === 'lost').length;
   const avg = (f) => reports.reduce((a, r) => a + f(r), 0) / reports.length;
   console.log(`summary over ${reports.length} seeds: won ${wins}, lost ${losses}, still playing ${reports.filter((r) => r.outcome === 'playing').length}`);
-  console.log(`avg actions=${avg((r) => r.actions).toFixed(0)} avg hours=${avg((r) => r.hours).toFixed(2)} avg saved=${avg((r) => r.starsSaved).toFixed(1)}`);
+  console.log(`avg actions=${avg((r) => r.actions).toFixed(0)} avg act1=${avg((r) => r.act1Actions).toFixed(0)} avg hours=${avg((r) => r.hours).toFixed(2)} avg saved=${avg((r) => r.starsSaved).toFixed(1)}`);
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

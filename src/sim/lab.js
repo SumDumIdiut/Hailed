@@ -5,6 +5,8 @@ import { addLog, spend } from './util.js';
 import { COSTS, orbitDistanceAu } from './ship.js';
 import { drawEvent } from './events.js';
 import { relayInRange } from './galaxy.js';
+import { isPrologue } from './prologue.js';
+import { ensurePrologueSampleStrain } from './genetics.js';
 
 export const TOLERANT = 0.9;
 export const STEP_YEARS = COSTS.breed.years;
@@ -96,6 +98,7 @@ export function collectSample(state, planetId, how = 'instant') {
   if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'survey', { chance: 0.2, planetId });
   const cost = spend(state, COSTS.sample, tick);
   addLog(state, `Collected a Taumoeba sample from ${p.name}${how === 'tether' ? ' with the tether probe' : ''}.`);
+  if (isPrologue(state) && f.star.id === 'tauceti' && p.special === 'adrian') ensurePrologueSampleStrain(state);
   return { ok: true, text: `Taumoeba sample collected from ${p.name}. Samples aboard: ${state.ship.samples}.`, cost };
 }
 

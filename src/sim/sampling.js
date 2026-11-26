@@ -6,6 +6,8 @@ import { tick } from './astrophage.js';
 import { addLog, spend } from './util.js';
 import { COSTS } from './ship.js';
 import { closeFindings, collectSample } from './lab.js';
+import { isPrologue } from './prologue.js';
+import { ensurePrologueSampleStrain } from './genetics.js';
 import { petrovaTarget } from './harvest.js';
 
 const TAU = Math.PI * 2;
@@ -54,7 +56,9 @@ export function scanProgress(state, planetId, dCoverage) {
   const p = f.planet, sc = scanOf(p);
   if (!sc.active || !orbiting(state, planetId)) return { ok: false, coverage: sc.coverage, text: 'No sweep in progress.' };
   const before = sc.coverage;
-  sc.coverage = clamp(sc.coverage + Math.max(0, dCoverage), 0, 1);
+  // The prologue sweep is 3x faster: a short tutorial scan, not the full map crawl.
+  const rate = isPrologue(state) ? 3 : 1;
+  sc.coverage = +clamp(sc.coverage + Math.max(0, dCoverage) * rate, 0, 1).toFixed(4);
   let crossed = false, text = '';
   if (before < SCAN.fullAt && sc.coverage >= SCAN.fullAt) {
     crossed = true;
@@ -243,7 +247,12 @@ export function sampleStep(state, { depthDelta = 0, dt = 1 / 60 } = {}) {
   }
   return snapshot(s);
 }
-export function endSample(state) { state.sampling = null; return { ok: true }; }
+export function endSample(state) {
+  const success = state.sampling?.status === 'success';
+  state.sampling = null;
+  if (success) ensurePrologueSampleStrain(state);
+  return { ok: true };
+}
 
 // ---- helper path for tests / scripted runs: sweep, pick the first hotspot and fly the probe with a perfect controller ----
 export function autoSample(state, planetId, { maxSteps = 4000 } = {}) {

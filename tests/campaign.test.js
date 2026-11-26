@@ -15,10 +15,12 @@ const perfect = (g) => {
   return s;
 };
 const star = (g, id) => g.stars.find((s) => s.id === id);
+// Act II/III tests start from the legacy Act I state; the new prologue has its own file.
+const createGame = (seed) => S.createGame(seed, { legacyActI: true });
 const toAct2 = (g) => { g.delivered.sol = true; g.delivered.eri40 = true; checkEnd(g); return g; };
 
 test('createGame integrates the expansion state', () => {
-  const g = S.createGame(7);
+  const g = createGame(7);
   assert.equal(g.stars.length, 60);
   assert.equal(g.stars.filter((s) => s.id.startsWith('g-')).length, 48);
   for (const s of g.stars.filter((x) => x.id.startsWith('g-'))) assert.ok(s.infection <= 0.01, s.id + ' ' + s.infection);
@@ -45,7 +47,7 @@ test('act I extinction clocks match the old twelve-star game', () => {
     ship: { starId: 'tauceti' }, stars: createStars(seed),
     delivered: { sol: false, eri40: false }, rng: { s: mixSeed(seed, 0xA57A) },
   };
-  const g = S.createGame(seed);
+  const g = createGame(seed);
   assert.equal(S.extinctionYears(old, 'sol'), S.extinctionYears(g, 'sol'));
   assert.equal(S.extinctionYears(old, 'eri40'), S.extinctionYears(g, 'eri40'));
   // The old clocks do not drift while act I is running.
@@ -59,7 +61,7 @@ test('act I extinction clocks match the old twelve-star game', () => {
 });
 
 test('double delivery advances to act II, seeds twelve stars and shows a card', () => {
-  const g = toAct2(S.createGame(3));
+  const g = toAct2(createGame(3));
   assert.equal(g.status, 'playing');                       // no classic 'won'
   assert.equal(g.campaign.act, 2);
   assert.equal(g.campaign.targets.length, 12);
@@ -79,7 +81,7 @@ test('double delivery advances to act II, seeds twelve stars and shows a card', 
 });
 
 test('eight saves advance to act III and mark the Source buoy', () => {
-  const g = toAct2(S.createGame(4));
+  const g = toAct2(createGame(4));
   g.campaign.saved = g.campaign.targets.slice(0, 8);
   S.tick(g, 0.25);
   assert.equal(g.campaign.act, 3);
@@ -94,7 +96,7 @@ test('eight saves advance to act III and mark the Source buoy', () => {
 });
 
 test('act III: visiting the buoy chain grants the Cartographer flags without event draws', () => {
-  const g = toAct2(S.createGame(21));
+  const g = toAct2(createGame(21));
   g.campaign.saved = g.campaign.targets.slice(0, 8);
   S.tick(g, 0.25);
   assert.equal(g.campaign.act, 3);
@@ -104,7 +106,7 @@ test('act III: visiting the buoy chain grants the Cartographer flags without eve
   for (const id of chain) S.visitPoi(g, id);
   for (let i = 1; i <= 6; i++) assert.equal(g.events.flags[`carto${i}`], true, `carto${i}`);
   // Visits arriving out of order still decode the whole chain.
-  const h = toAct2(S.createGame(21));
+  const h = toAct2(createGame(21));
   h.campaign.saved = h.campaign.targets.slice(0, 8);
   S.tick(h, 0.25);
   for (const id of [...h.campaign.buoyChain].reverse()) S.visitPoi(h, id);
@@ -112,7 +114,7 @@ test('act III: visiting the buoy chain grants the Cartographer flags without eve
 });
 
 test('act III: ten dark lane worlds, or twelve centuries, end the run', () => {
-  const g = toAct2(S.createGame(22));
+  const g = toAct2(createGame(22));
   g.campaign.saved = g.campaign.targets.slice(0, 8);
   S.tick(g, 0.25);
   assert.equal(g.campaign.act, 3);
@@ -121,7 +123,7 @@ test('act III: ten dark lane worlds, or twelve centuries, end the run', () => {
   assert.equal(g.status, 'lost');
   assert.match(g.statusText, /Lanes/);
 
-  const h = toAct2(S.createGame(22));
+  const h = toAct2(createGame(22));
   h.campaign.saved = h.campaign.targets.slice(0, 8);
   S.tick(h, 0.25);
   h.time.worldYears = 1201;
@@ -131,14 +133,14 @@ test('act III: ten dark lane worlds, or twelve centuries, end the run', () => {
 });
 
 test('act II: six dark target stars lose; sol going dark loses too', () => {
-  const g = toAct2(S.createGame(5));
+  const g = toAct2(createGame(5));
   for (const id of g.campaign.targets.slice(0, 6)) star(g, id).infection = 0.95;
   S.tick(g, 0.25);
   assert.equal(g.status, 'lost');
   assert.ok(g.campaign.dark.length >= 6);
   assert.ok(g.log.some((l) => /gone dark/.test(l.text)));
 
-  const h = toAct2(S.createGame(5));
+  const h = toAct2(createGame(5));
   const sol = star(h, 'sol'); sol.infection = 0.95;
   S.tick(h, 0.25);
   assert.equal(h.status, 'lost');
@@ -146,7 +148,7 @@ test('act II: six dark target stars lose; sol going dark loses too', () => {
 });
 
 test('deliverStrain credits a save and reports failing traits', () => {
-  const g = toAct2(S.createGame(6));
+  const g = toAct2(createGame(6));
   const id = g.campaign.targets[0];
   g.ship.starId = id;
   const s = perfect(g);
@@ -159,7 +161,7 @@ test('deliverStrain credits a save and reports failing traits', () => {
   assert.ok(g.campaign.score > 0);
   assert.ok(g.log.some((l) => /saved/.test(l.text)));
 
-  const h = toAct2(S.createGame(6));
+  const h = toAct2(createGame(6));
   const tid = h.campaign.targets[1];
   h.ship.starId = tid;
   const badStrain = newStrain(h);
@@ -194,7 +196,7 @@ test('board contracts complete and pay their reward once', () => {
 });
 
 test('beetle arrivals are credited to the campaign', () => {
-  const g = toAct2(S.createGame(9));
+  const g = toAct2(createGame(9));
   g.rocky.materials = { minerals: 10, volatiles: 10, gas: 10, silicates: 10 };
   const s = perfect(g);
   const target = g.campaign.targets[0];
@@ -207,7 +209,7 @@ test('beetle arrivals are credited to the campaign', () => {
 });
 
 test('beetle delivery uses its launched strain snapshot even after the lab culls the culture', () => {
-  const g = toAct2(S.createGame(23));
+  const g = toAct2(createGame(23));
   g.rocky.materials = { minerals: 10, volatiles: 10, gas: 10, silicates: 10 };
   const s = perfect(g);
   const target = g.campaign.targets[0];
@@ -221,7 +223,7 @@ test('beetle delivery uses its launched strain snapshot even after the lab culls
 });
 
 test('final win needs carto6 and a source-grade strain delivered at the Source', () => {
-  const g = toAct2(S.createGame(10));
+  const g = toAct2(createGame(10));
   g.campaign.saved = g.campaign.targets.slice(0, 8);
   S.tick(g, 0.25);
   assert.equal(g.campaign.act, 3);
@@ -367,7 +369,7 @@ test('research: scans, samples and first visits', () => {
   resetContent();
   registerPack({ id: 'no-cards', events: [], techs: [], pois: [] });
   try {
-    const g = S.createGame(13);
+    const g = createGame(13);
     assert.equal(S.scanPlanet(g, 'tauceti-3').ok, true);
     assert.equal(g.research, 2);
     assert.equal(collectSample(g, 'tauceti-3').ok, true);
@@ -383,7 +385,7 @@ test('research: scans, samples and first visits', () => {
 
 test('travel draws flight and arrival events deterministically', () => {
   const run = () => {
-    const g = S.createGame(14);
+    const g = createGame(14);
     S.travel(g, 'eri40');
     return g;
   };

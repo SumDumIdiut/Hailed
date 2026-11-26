@@ -1,7 +1,8 @@
 import { stateRng } from './rng.js';
 import { starDistance, findStar } from './stars.js';
 import { addLog } from './util.js';
-import { advanceAct } from './campaign.js';
+import { advanceAct, completePrologue } from './campaign.js';
+import { isPrologue } from './prologue.js';
 
 export const DIM_K = 0.5;          // lum = lum0 * (1 - DIM_K * infection)
 export const EXTINCT_FRAC = 0.85;  // world dies when lum < 0.85 * lum0  (infection > 0.3)
@@ -97,7 +98,12 @@ export function checkEnd(state) {
   }
   if (state.delivered.sol && state.delivered.eri40) {
     // Saves without the campaign still win here; a campaign moves on to act II.
-    if (state.campaign) { advanceAct(state); return; }
+    if (state.campaign) {
+      // A prologue that reaches both flags by another route still closes properly.
+      if (isPrologue(state)) completePrologue(state);
+      else advanceAct(state);
+      return;
+    }
     state.status = 'won';
     state.statusText = 'Taumoeba are hunting Astrophage at both Sol and 40 Eridani. Earth and Erid are saved.';
     addLog(state, state.statusText);

@@ -4,7 +4,8 @@ import { createRng, mixSeed, hashStr } from './rng.js';
 import { addLog } from './util.js';
 import { findStar, starDistance } from './stars.js';
 import { revealAround, extendGalaxy, extendLanes, genPois, initKnowledge } from './galaxy.js';
-import { BIOSPHERE, biosphereProfile, canSave, coverage, geneticsOf } from './genetics.js';
+import { BIOSPHERE, biosphereProfile, canSave, coverage, geneticsOf, newStrain, nameStrain } from './genetics.js';
+import { isPrologue, prologueProfile, solBeetleLaunched } from './prologue.js';
 import { extinctionYears, updateLum } from './astrophage.js';
 import { createGame } from './index.js';
 
@@ -136,6 +137,7 @@ export function advanceAct(state) {
   if (state.status !== 'playing' || c.mode === 'endless') return false;
   if (c.act === 1) {
     c.act = 2;
+    c.prologue = false;   // prologue modifiers stop the moment Act II opens
     // Act I's deliveries already host Taumoeba: they count as saved (immune to spread and event spores).
     for (const id of ['sol', 'eri40']) { const s = (state.stars || []).find((x) => x.id === id); if (s && state.delivered?.[id]) s.saved = true; }
     seedAct2(state, c);
@@ -152,6 +154,65 @@ export function advanceAct(state) {
     return true;
   }
   return false;
+}
+
+// The prologue's teaching beats, in order. The UI asks after each action which beat comes
+// next; 'done' is not a wait state — it opens Act II as soon as Erid is delivered and the
+// Sol courier is away (the courier's arrival is guaranteed and credited later).
+export function prologueStep(state) {
+  const c = ensureCampaign(state);
+  if (!isPrologue(state) || state.status !== 'playing') return 'done';
+  const beetle = solBeetleLaunched(state);
+  const eridDone = !!state.delivered?.eri40;
+  if (beetle && eridDone) {
+    state.delivered.sol = true;
+    completePrologue(state);
+    return 'done';
+  }
+  const adrian = (findStar(state, 'tauceti')?.planets || []).find((p) => p.special === 'adrian');
+  if (!adrian || (adrian.scanLevel || 0) < 2) return 'scan';
+  const g = geneticsOf(state);
+  if (!g.strains.some((s) => s.name === 'Taumoeba')) return 'sample';
+  const sol = findStar(state, 'sol'), eri = findStar(state, 'eri40');
+  const pSol = biosphereProfile(sol, state), pEri = biosphereProfile(eri, state);
+  const best = (g.strains || []).slice()
+    .sort((a, b) => Math.min(coverage(b, pSol), coverage(b, pEri)) - Math.min(coverage(a, pSol), coverage(a, pEri)))[0];
+  if (!best || !canSave(best, pSol) || !canSave(best, pEri)) return 'breed';
+  if (!beetle) return 'beetle';
+  if (state.ship.starId !== 'eri40') return 'jump';
+  if (!eridDone) return 'deliver';
+  return 'done';
+}
+
+// Shared ending for a played prologue and createGame({ skipPrologue: true }). It leaves
+// a named starter culture, both worlds delivered and saved, and the Act II card pending.
+export function completePrologue(state) {
+  const c = ensureCampaign(state);
+  if (c.act !== 1 || c.mode === 'endless' || state.status !== 'playing') return false;
+  const g = geneticsOf(state);
+  const target = prologueProfile({ id: 'eri40' });
+  let strain = (g.strains || []).find((s) => canSave(s, target));
+  if (!strain) {
+    // A skip gets a ready-made culture; a finished run promotes the culture it bred.
+    strain = newStrain(state);
+    for (const t of BIOSPHERE) strain.traits[t] = 0.95;
+  }
+  nameStrain(state, strain.id, 'Taumoeba-1');
+  g.best = strain.id;
+  state.delivered.sol = true;
+  state.delivered.eri40 = true;
+  for (const id of ['sol', 'eri40']) {
+    const s = findStar(state, id);
+    if (s) { s.saved = true; s.infection = Math.max(0, s.infection - 0.5); updateLum(s); }
+    if (!c.saved.includes(id)) {
+      c.saved.push(id);
+      c.score = +(c.score + starYears(state, id)).toFixed(4);
+      state.research = (state.research ?? 0) + 10;
+    }
+  }
+  addLog(state, 'Prologue complete: Taumoeba-1 is home at Sol and Erid. The Spread begins.');
+  advanceAct(state);
+  return true;
 }
 
 const starYears = (state, id) => {
@@ -318,7 +379,7 @@ export function deliverStrain(state, strainId) {
   const c = ensureCampaign(state);
   const sourceRun = c.act === 3 && c.sourceStarId === star.id && !c.sourceDelivered;
   if (star.saved && !sourceRun) return bad(`${star.name} has already been saved.`);
-  const profile = biosphereProfile(star);
+  const profile = biosphereProfile(star, state);
   const cov = coverage(strain, profile);
   const label = strain.name || strain.id;
   if (!canSave(strain, profile)) {
@@ -331,6 +392,16 @@ export function deliverStrain(state, strainId) {
   star.infection = Math.max(0, star.infection - 0.5);
   updateLum(star);
   creditSave(state, star, strain, `Strain ${label}`, years);
+  // In the prologue the Erid delivery is the ship's half of the teaching loop; the
+  // other half is the free Beetle to Sol. Once both are in place the act opens now,
+  // without waiting for the courier's arrival.
+  if (isPrologue(state) && star.id === 'eri40') {
+    state.delivered.eri40 = true;
+    if (solBeetleLaunched(state)) {
+      state.delivered.sol = true;
+      completePrologue(state);
+    }
+  }
   if (sourceRun && canSave(strain, SOURCE_PROFILE)) {
     c.sourceDelivered = true;
     const poi = (state.pois || []).find((p) => p.id === c.sourcePoiId);
@@ -519,7 +590,7 @@ export function campaignTick(state) {
 
 // The unbounded Petrova Front: act-II rules from the start, harder each cycle.
 export function startEndless(seed = 1) {
-  const state = createGame(seed);
+  const state = createGame(seed, { legacyActI: true });
   const c = ensureCampaign(state);
   c.mode = 'endless';
   c.act = 2;

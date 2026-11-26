@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame } from '../src/sim/index.js';
+import * as S from '../src/sim/index.js';
 import { registerPack, content, resetContent } from '../src/sim/content.js';
 import { ensureEvents, drawEvent, pendingEvent, resolveChoice } from '../src/sim/events.js';
 import { PACKS, loadContent } from '../content/index.js';
 
 const star = (g, id) => g.stars.find((s) => s.id === id);
+// Event effect tests assume the original starting inventory.
+const createGame = (seed) => S.createGame(seed, { legacyActI: true });
 const fresh = () => { const g = createGame(1); ensureEvents(g); return g; };
 const card = (id, trigger, choices, extra = {}) => ({
   id, trigger, title: id, text: `The ${id} card.`, choices, ...extra,
