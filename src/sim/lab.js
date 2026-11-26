@@ -4,6 +4,7 @@ import { tick, checkEnd } from './astrophage.js';
 import { addLog, spend } from './util.js';
 import { COSTS, orbitDistanceAu } from './ship.js';
 import { drawEvent } from './events.js';
+import { relayInRange } from './galaxy.js';
 
 export const TOLERANT = 0.9;
 export const STEP_YEARS = COSTS.breed.years;
@@ -37,7 +38,17 @@ export function closeFindings(p) {
 export function scanPlanet(state, planetId) {
   const f = findPlanet(state, planetId);
   if (!f) return { ok: false, text: 'No such planet.', findings: [] };
-  if (f.star.id !== state.ship.starId) return { ok: false, text: `${f.planet.name} is not in this system.`, findings: [] };
+  if (f.star.id !== state.ship.starId) {
+    // A Cartographer relay within range can resolve a distant world's atmosphere.
+    if (!relayInRange(state, f.star.id)) return { ok: false, text: `${f.planet.name} is not in this system.`, findings: [] };
+    const p = f.planet;
+    p.scanned = true;
+    p.scanLevel = Math.max(p.scanLevel || 0, 1);
+    const cost = spend(state, COSTS.scanRemote, tick);
+    state.research = (state.research ?? 0) + 2;
+    if ((state.campaign?.act ?? 1) >= 2) drawEvent(state, 'survey', { chance: 0.75, planetId });
+    return { ok: true, text: `Relay scan of ${p.name}: ${p.type} world, orbit ${p.orbit} AU; coarse biosphere data only.`, findings: [], level: 1, cost };
+  }
   const p = f.planet, fi = [];
   const inOrbit = orbiting(state, planetId);
   const close = inOrbit || ((state.ship.planetId ?? null) !== null && orbitDistanceAu(state, p) <= CLOSE_AU);
@@ -54,7 +65,7 @@ export function scanPlanet(state, planetId) {
   p.scanned = true;
   const cost = spend(state, close ? COSTS.scan : COSTS.scanRemote, tick);
   state.research = (state.research ?? 0) + 2;
-  drawEvent(state, 'survey', { chance: 0.25, planetId });
+  drawEvent(state, 'survey', { chance: (state.campaign?.act ?? 1) >= 2 ? 0.75 : 0.25, planetId });
   return { ok: true, text: `${close ? 'Scan' : 'Remote scan'} of ${p.name}: ${fi.join('; ')}.`, findings: fi, level: p.scanLevel, cost };
 }
 
@@ -82,6 +93,7 @@ export function collectSample(state, planetId, how = 'instant') {
   }
   refresh(state);
   state.research = (state.research ?? 0) + 3;
+  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'survey', { chance: 0.2, planetId });
   const cost = spend(state, COSTS.sample, tick);
   addLog(state, `Collected a Taumoeba sample from ${p.name}${how === 'tether' ? ' with the tether probe' : ''}.`);
   return { ok: true, text: `Taumoeba sample collected from ${p.name}. Samples aboard: ${state.ship.samples}.`, cost };

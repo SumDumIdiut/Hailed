@@ -421,7 +421,7 @@ export default {
 
     // ---- the Cartographers: six linked cards, flags carto1..carto6 -------------
     {
-      id: 'carto-1-signal', trigger: 'flight', weight: 1, once: true,
+      id: 'carto-1-signal', trigger: 'flight', weight: 8, once: true,
       title: 'The Cartographers I: a patient carrier',
       text: 'A carrier wave rides the Astrophage lane. It repeats a map of the lane itself, though no living voice sends it.',
       choices: [

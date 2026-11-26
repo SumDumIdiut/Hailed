@@ -5,6 +5,8 @@ import { stateRng } from './rng.js';
 import { tick } from './astrophage.js';
 import { addLog, spendTime } from './util.js';
 import { COSTS } from './ship.js';
+import { effectMul } from './tech.js';
+import { drawEvent } from './events.js';
 
 export const TRAITS = ['nitrogen', 'co2', 'cold', 'heat', 'radiation', 'vigor'];
 export const BIOSPHERE = ['nitrogen', 'co2', 'cold', 'heat', 'radiation'];   // the atmospheric traits a strain must cover
@@ -72,15 +74,17 @@ export function newStrain(state, parent) {
     const base = parent && parent.traits ? parent.traits[t] : 0.05 + rng.next() * 0.03;
     traits[t] = +clamp01(base).toFixed(4);
   }
-  const strain = { id: `g${g.nextId++}`, name: '', traits, gen: parent ? (parent.gen ?? 0) + 1 : 0 };
+  const strain = { id: `g${g.nextId++}`, name: '', traits, gen: parent ? (parent.gen ?? 0) + 1 : 0, population: parent ? (parent.population ?? 200) : 200 };
   g.strains.push(strain);
   if (g.strains.length > MAX_STRAINS) g.strains.splice(0, g.strains.length - MAX_STRAINS);
-  g.best = bestId(g.strains);
+  if (!g.best || !g.strains.some((s) => s.id === g.best)) g.best = bestId(g.strains);
   return strain;
 }
 
-// One generation: push the focus trait up (more with pressure), let the others drift, and pay the cost.
-export function breed(state, { focus, pressure } = {}, tickFn = tick) {
+// One generation from the selected strain: push the focus trait up, let the others drift,
+// and pay the cost. `strainId` lets callers breed a chosen parent even when `best` points
+// at a different culture; the UI marks its selection by setting genetics.best.
+export function breed(state, { focus, pressure, strainId } = {}, tickFn = tick) {
   const g = geneticsOf(state);
   const strains = g.strains;
   const fail = (text) => ({ ok: false, text, strain: null, escapeRisk: state.lab.escapeRisk });
@@ -88,29 +92,35 @@ export function breed(state, { focus, pressure } = {}, tickFn = tick) {
   if (!strains.length) return fail('No Taumoeba strains to breed yet. Sample the world first.');
   const focusT = TRAITS.includes(focus) ? focus : null;
   if (!focusT) return fail(`Unknown trait to breed for: ${focus}.`);
-  const p = clamp01(Number(pressure) || 0);
-  const parent = strains.find((s) => s.id === g.best) || strains[0];
+  // Lab techs raise the usable pressure ceiling; a sluggish culture pushes less far.
+  const p = clamp01(Number(pressure) || 0) * Math.max(1, effectMul(state, 'breedPressureMax'));
+  const parent = strains.find((s) => s.id === (strainId || g.best)) || strains.find((s) => s.id === g.best) || strains[strains.length - 1];
   const rng = stateRng(state);
-  const push = 0.08 + 0.5 * p;
+  const vigor = clamp01(parent.traits?.vigor ?? 0.5);
+  const push = (0.025 + 0.1 * p) * (0.7 + 0.3 * vigor);
   const traits = { ...parent.traits };
-  traits[focusT] = +clamp01((traits[focusT] ?? 0) + push + rng.range(0, 0.02)).toFixed(4);
+  traits[focusT] = +clamp01((traits[focusT] ?? 0) + push + rng.range(0, 0.01)).toFixed(4);
   for (const t of TRAITS) {
     if (t === focusT) continue;
-    traits[t] = +clamp01((traits[t] ?? 0) + (rng.next() - 0.5) * 0.06).toFixed(4);
+    traits[t] = +clamp01((traits[t] ?? 0) + (rng.next() - 0.5) * 0.05).toFixed(4);
   }
-  if (p > 0.4) traits.vigor = +clamp01((traits.vigor ?? 0) - (0.04 + 0.12 * p)).toFixed(4);   // high pressure burns generation speed
-  const strain = { id: `g${g.nextId++}`, name: '', traits, gen: (parent.gen ?? 0) + 1 };
+  if (p > 0.4) traits.vigor = +clamp01((traits.vigor ?? 0) - (0.01 + 0.04 * p)).toFixed(4);   // high pressure burns generation speed
+  const strain = { id: `g${g.nextId++}`, name: '', traits, gen: (parent.gen ?? 0) + 1, population: parent.population ?? 200 };
   if (strains.length >= MAX_STRAINS) {
-    const keep = strains.slice().sort((a, b) => score(b) - score(a)).slice(0, MAX_STRAINS - 1);
+    // Never cull the culture being bred from: the player is still working on it.
+    const keep = strains.filter((s) => s.id === parent.id)
+      .concat(strains.filter((s) => s.id !== parent.id).sort((a, b) => score(b) - score(a)).slice(0, MAX_STRAINS - 2));
     strains.length = 0; strains.push(...keep);
   }
   strains.push(strain);
   g.best = strain.id;
   state.lab.escapeRisk = state.ship.upgrades.includes('xenonite-lab') ? 0 : +(0.6 * Math.max(...BIOSPHERE.map((t) => strain.traits?.[t] ?? 0)) ** 2).toFixed(4);
+  state.research = (state.research ?? 0) + 2;
   spendTime(state, COSTS.breed.years, tickFn);
-  const text = `Breeding generation ${strain.gen} for ${focusT} at ${(p * 100).toFixed(0)}% pressure. Strongest trait ${+(BIOSPHERE.map((t) => strain.traits?.[t] ?? 0).reduce((a, b) => Math.max(a, b), 0)).toFixed(3)}.`;
+  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.5 });
+  const text = `Breeding generation ${strain.gen} from ${parent.id} for ${focusT} at ${(p * 100).toFixed(0)}% pressure. Strongest trait ${+(BIOSPHERE.map((t) => strain.traits?.[t] ?? 0).reduce((a, b) => Math.max(a, b), 0)).toFixed(3)}.`;
   addLog(state, text);
-  return { ok: true, text, strain, escapeRisk: state.lab.escapeRisk, cost: { years: COSTS.breed.years, fuelKg: COSTS.breed.fuelKg } };
+  return { ok: true, text, strain, parent, escapeRisk: state.lab.escapeRisk, cost: { years: COSTS.breed.years, fuelKg: COSTS.breed.fuelKg } };
 }
 
 export function nameStrain(state, id, name) {

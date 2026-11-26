@@ -1,6 +1,7 @@
 import { createRng, mixSeed, hashStr, stateRng } from './rng.js';
-import { starDistance } from './stars.js';
+import { findStar, starDistance } from './stars.js';
 import { addLog } from './util.js';
+import { effectAdd } from './tech.js';
 
 const CLASS_COLOR = {
   A: [0.78, 0.85, 1.0], F: [0.98, 0.96, 0.9], G: [1.0, 0.93, 0.74],
@@ -230,11 +231,22 @@ export function revealAround(state, starId, radiusLy) {
   return added;
 }
 
+export function relayRadius(state) {
+  return 10 + effectAdd(state, 'relayRadiusAdd');
+}
+
+// A repaired Cartographer buoy can read a distant system's biosphere from its parking orbit.
+export function relayInRange(state, starId) {
+  const target = findStar(state, starId);
+  const relays = (state.galaxy?.relays || []).map((id) => findStar(state, id)).filter(Boolean);
+  return !!target && relays.some((r) => starDistance(target, r) <= relayRadius(state));
+}
+
 export function buildRelay(state, starId) {
   if (!state.galaxy) initKnowledge(state);
-  if (state.galaxy.relays.includes(starId)) return false;
+  if (!findStar(state, starId) || state.galaxy.relays.includes(starId)) return false;
   state.galaxy.relays.push(starId);
-  revealAround(state, starId, 10);
+  revealAround(state, starId, relayRadius(state));
   return true;
 }
 
@@ -253,10 +265,11 @@ export function spreadTick(state, dtYears) {
       if (!src || !dst) continue;
       if (src.saved === true || dst.saved === true) continue;
       if (!(src.infection > 0.25)) continue;
-      const prob = 0.04 * (dtYears || 0) * src.infection;
+      // One lane signature every few decades per infected star: pressure, not an avalanche.
+      const prob = 0.0003 * (dtYears || 0) * src.infection;
       if (rng.chance(Math.min(1, Math.max(0, prob)))) {
         const wasKnown = !!(state.galaxy.known && state.galaxy.known[dst.id]);
-        dst.infection = Math.max(dst.infection || 0, 0.02);
+        dst.infection = Math.max(dst.infection || 0, 0.003);
         if (wasKnown) addLog(state, `Astrophage signatures detected at ${dst.name}.`);
       }
     }

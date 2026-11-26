@@ -48,7 +48,9 @@ export function createGame(seed = 1) {
   // are left out of the old Petrova spread until act II opens the lanes.
   for (const s of extra) {
     s.procedural = true;
-    s.infection = Math.min(s.infection, 0.01);
+    // Clean until the lanes deliver Astrophage: otherwise all 48 procedural stars
+    // mature together the moment act II opens and the sky goes dark in a century.
+    s.infection = 0;
     updateLum(s);
   }
   const stars = base.concat(extra);

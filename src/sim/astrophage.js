@@ -7,18 +7,26 @@ export const DIM_K = 0.5;          // lum = lum0 * (1 - DIM_K * infection)
 export const EXTINCT_FRAC = 0.85;  // world dies when lum < 0.85 * lum0  (infection > 0.3)
 export const INFECTION_LIMIT = (1 - EXTINCT_FRAC) / DIM_K;
 const GROWTH = { A: 0.08, F: 0.07, G: 0.052, K: 0.058, M: 0.045 };
+// Act I keeps the original Petrova-line numbers exactly. Later acts slow the star-to-star
+// spread (otherwise every procedural world goes dark in a century) and set a gentler
+// growth curve, so a star detected along the lanes has years of runway instead of weeks.
 const SPREAD_RATE = 0.6, SPREAD_SEED = 0.01, SPREAD_LEN = 6;
+const LATE_SPREAD_RATE = 0.002, LATE_SPREAD_SEED = 0.0005, LATE_SPREAD_LEN = 4;
+const LATE_GROWTH_MUL = 0.6;
 const STEP = 0.25;
 
 const RATE_OVERRIDE = { sol: 0.046 };
 export function growthRate(star) { return RATE_OVERRIDE[star.id] ?? GROWTH[star.spectral[0]] ?? 0.05; }
 // Net logistic parameters: dI/dt = a*I - r*I^2
 export function dynamics(state, star) {
-  const r = growthRate(star);
+  const rate = growthRate(star);
   let m = 0;
-  if (star.id === 'tauceti') m = 0.85 * r;                 // natural Taumoeba predator -> equilibrium I = 0.15
-  if (state.delivered[star.id]) m = 2.5 * r;                // delivered Taumoeba hunt Astrophage
-  return { r, a: r - m };
+  if (star.id === 'tauceti') m = 0.85 * rate;              // natural Taumoeba predator -> equilibrium I = 0.15
+  if (state.delivered[star.id] || star.saved) m = 2.5 * rate; // delivered Taumoeba hunt Astrophage
+  const mul = (state.campaign?.act ?? 1) >= 2 ? LATE_GROWTH_MUL : 1;
+  // Newly detected lane stars take far longer to mature than the original targets.
+  const detected = star.extra ? 0.2 : 1;
+  return { r: rate * mul * detected, a: (rate - m) * mul * detected };
 }
 function advance(I, a, r, h) {
   if (I <= 0) return 0;
@@ -38,13 +46,17 @@ function step(state, h) {
     s.infection = advance(s.infection, a, r, h);
   }
   // Petrova-line spread: infected stars seed others, probability falls off with distance.
+  const late = (state.campaign?.act ?? 1) >= 2;
+  const spreadRate = late ? LATE_SPREAD_RATE : SPREAD_RATE;
+  const spreadSeed = late ? LATE_SPREAD_SEED : SPREAD_SEED;
+  const spreadLen = late ? LATE_SPREAD_LEN : SPREAD_LEN;
   for (const src of stars) {
-    if (src.infection < 0.02) continue;
+    if (src.infection < 0.02 || src.saved) continue;
     for (const dst of stars) {
       if (dst === src) continue;
-      const w = Math.exp(-starDistance(src, dst) / SPREAD_LEN);
-      if (rng.next() < h * SPREAD_RATE * w * src.infection) {
-        dst.infection = Math.min(1, dst.infection + SPREAD_SEED * (0.5 + w));
+      const w = Math.exp(-starDistance(src, dst) / spreadLen);
+      if (rng.next() < h * spreadRate * w * src.infection) {
+        dst.infection = Math.min(1, dst.infection + spreadSeed * (0.5 + w));
       }
     }
   }

@@ -3,6 +3,7 @@ import { tick } from './astrophage.js';
 import { addLog } from './util.js';
 import { drawEvent } from './events.js';
 import { revealAround } from './galaxy.js';
+import { effectMul } from './tech.js';
 
 const G_LY_YR2 = 1.0323;            // 1 g in ly/yr^2 (c = 1)
 export const ACCEL = 1.5 * G_LY_YR2; // 1.5 g spin drive
@@ -18,6 +19,7 @@ export function relativisticTrip(d, a = ACCEL) {
 export function fuelCost(state, d) {
   let f = FUEL_BASE * d * (1 + FUEL_CURVE * d);
   if (state.ship.upgrades.includes('eridian-nav')) f *= NAV_DISCOUNT;
+  f *= effectMul(state, 'jumpFuelMul');
   return Math.round(f);
 }
 
@@ -66,8 +68,9 @@ export function travel(state, starId) {
       if (d <= 2) poi.visited = true;
     }
     // Flight cards first; an arrival card is only drawn when nothing is already pending.
-    drawEvent(state, 'flight', { chance: 0.35, from: from.id, to: starId });
-    if (!state.events?.pending) drawEvent(state, 'arrive', { chance: 0.3, starId });
+    const late = (state.campaign?.act ?? 1) >= 2;
+    drawEvent(state, 'flight', { chance: late ? 0.7 : 0.35, from: from.id, to: starId });
+    if (!state.events?.pending) drawEvent(state, 'arrive', { chance: late ? 0.55 : 0.3, starId });
   }
   return { ...plan, status: state.status };
 }

@@ -65,6 +65,28 @@ test('breeding pushes the focus trait up, pays ship time, and guards the escape 
   assert.equal(h.lab.escapeRisk, 0);
 });
 
+test('repeated breeding from the selected strain advances the generation', () => {
+  const g = createGame(1);
+  g.ship.upgrades.push('xenonite-lab');          // no escape risk ends the run early
+  const first = newStrain(g);
+  g.genetics.best = first.id;                    // the UI marks its selection this way
+  let parentId = first.id;
+  for (let n = 1; n <= 5; n++) {
+    const b = breed(g, { focus: 'nitrogen', pressure: 0.2 });
+    assert.equal(b.ok, true, b.text);
+    assert.equal(b.parent.id, parentId, 'breeds from the strain on screen');
+    assert.equal(b.strain.gen, n, 'generation N+1, never generation 1 again');
+    parentId = b.strain.id;
+    g.genetics.best = parentId;                  // the UI selects the child next
+  }
+  // An explicit strainId wins over genetics.best (the bot uses this while working a target).
+  const other = newStrain(g);
+  g.genetics.best = other.id;
+  const b = breed(g, { focus: 'co2', pressure: 0.2, strainId: first.id });
+  assert.equal(b.parent.id, first.id);
+  assert.equal(b.strain.gen, first.gen + 1);
+});
+
 test('coverage and canSave: a strain covers a profile or it does not', () => {
   const g = createGame(1);
   const eri = star(g, 'eri40');

@@ -1,6 +1,7 @@
 // The tech tree. Tech defs come from content packs via techList(defs) — this module
 // is registry-free and takes the pack's list as a parameter.
 import { addLog } from './util.js';
+import { content } from './content.js';
 
 // Effect keys: multiplied (default 1), added (default 0), or unlocking a feature.
 const MUL_KEYS = ['fuelMul', 'jumpFuelMul', 'harvestMul', 'scanSpeedMul',
@@ -69,4 +70,30 @@ export function modifiers(state, defs) {
   }
   out.unlocks = [...unlocks];
   return out;
+}
+
+// Fold one multiplier for a mechanic that doesn't want to know about the registry
+// (breeding, jumps, beetles). Missing tech defs / empty packs simply yield 1.
+export function effectAdd(state, key) {
+  const owned = ownedIds(state);
+  if (!owned.length) return 0;
+  let add = 0;
+  const byId = new Map(content().techs.map((t) => [t.id, t]));
+  for (const id of owned) {
+    const v = byId.get(id)?.effects?.[key];
+    if (typeof v === 'number' && Number.isFinite(v)) add += v;
+  }
+  return add;
+}
+
+export function effectMul(state, key) {
+  const owned = ownedIds(state);
+  if (!owned.length) return 1;
+  let mul = 1;
+  const byId = new Map(content().techs.map((t) => [t.id, t]));
+  for (const id of owned) {
+    const v = byId.get(id)?.effects?.[key];
+    if (typeof v === 'number' && Number.isFinite(v)) mul *= v;
+  }
+  return mul;
 }

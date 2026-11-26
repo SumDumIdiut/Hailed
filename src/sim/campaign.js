@@ -27,6 +27,7 @@ export function ensureCampaign(state) {
   if (!Number.isFinite(c.difficulty)) c.difficulty = 1;
   if (c.pendingCard === undefined) c.pendingCard = null;
   if (c.targets === undefined) c.targets = [];
+  if (!Array.isArray(c.extraTargets)) c.extraTargets = [];
   return c;
 }
 
@@ -78,6 +79,38 @@ function seedAct3(state, c) {
     c.sourceStarId = nearestStarId(state, source.pos);
   }
   addLog(state, `ACT III — THE LANES: the Cartographer chain is charted. The lanes lead to ${source ? source.name : 'the far buoy'}.`);
+}
+
+// Later acts keep revealing new infections along the lanes. These worlds are not part of
+// the six-target loss rule; they are the work that makes the acts long.
+const EXTRA_INTERVAL = { 2: 14, 3: 16 };
+function seedNextStar(state, c) {
+  const act = c.act >= 3 ? 3 : 2;
+  const n = (c.extraTargets || []).length;
+  if (n >= 18) return false;   // a bounded wave, not an endless avalanche
+  const rng = createRng(mixSeed(state.seed ?? 1, hashStr(`lane-detection-${n}`)));
+  const skip = new Set(['sol', 'eri40', 'tauceti', ...(c.targets || []), ...(c.extraTargets || [])]);
+  const pool = (state.stars || []).filter((s) => !skip.has(s.id) && !s.saved && !s.dark && (s.infection ?? 0) < 0.03);
+  if (!pool.length) return false;
+  const s = pool[rng.int(0, pool.length - 1)];
+  s.extra = true;
+  s.infection = +(act === 3 ? 0.06 + rng.next() * 0.08 : 0.04 + rng.next() * 0.06).toFixed(4);
+  updateLum(s);
+  if (state.galaxy) state.galaxy.known[s.id] = true;
+  if (!Array.isArray(c.extraTargets)) c.extraTargets = [];
+  c.extraTargets.push(s.id);
+  addLog(state, `New Astrophage signature along the lanes at ${s.name}.`);
+  return true;
+}
+
+function detectNextStars(state, c) {
+  const interval = EXTRA_INTERVAL[c.act >= 3 ? 3 : 2];
+  if (!Number.isFinite(c.nextDetectionYears)) c.nextDetectionYears = state.time.worldYears + interval;
+  let guard = 0;
+  while (state.time.worldYears >= c.nextDetectionYears && guard++ < 6) {
+    seedNextStar(state, c);
+    c.nextDetectionYears += interval;
+  }
 }
 
 // Deliver the act card (the UI consumes and clears campaign.pendingCard).
@@ -280,6 +313,7 @@ function lose(state, text) {
 export function campaignTick(state) {
   const c = ensureCampaign(state);
   if (state.status !== 'playing') return state;
+  if (c.mode === 'campaign' && c.act >= 2) detectNextStars(state, c);
 
   // Beetle probes report their own arrival; credit them once here.
   for (const b of state.beetles || []) {
@@ -288,13 +322,22 @@ export function campaignTick(state) {
     const star = findStar(state, b.to);
     const strain = geneticsOf(state).strains.find((s) => s.id === b.strainId);
     if (star && star.saved) creditSave(state, star, strain, `Beetle ${b.id}`, 0);
+    // A courier can answer the Source too: the final check needs the strain, not the ship.
+    if (c.mode === 'campaign' && c.act === 3 && b.to === c.sourceStarId && !c.sourceDelivered
+      && strain && canSave(strain, SOURCE_PROFILE)) {
+      c.sourceDelivered = true;
+      const poi = (state.pois || []).find((p) => p.id === c.sourcePoiId);
+      if (poi) poi.used = true;
+      addLog(state, `Beetle ${b.id} carries the final strain to the Source.`);
+      checkFinal(state);
+    }
   }
 
   if (c.mode === 'campaign' && c.act === 2 && c.saved.length >= 8) advanceAct(state);
 
   // A star goes dark at 30% of its original luminosity; that is permanent.
   for (const s of state.stars || []) {
-    if (s.dark || typeof s.lum !== 'number' || typeof s.lum0 !== 'number') continue;
+    if (s.dark || s.saved || typeof s.lum !== 'number' || typeof s.lum0 !== 'number') continue;
     // With DIM_K = 0.5 a fully infested star bottoms out at half its light; an
     // infestation above 90% is the practical, reachable form of "dark".
     if (s.lum < DARK_LUM * s.lum0 || (s.infection ?? 0) >= 0.9) {

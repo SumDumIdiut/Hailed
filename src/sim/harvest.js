@@ -3,6 +3,8 @@
 import { findStar } from './stars.js';
 import { tick } from './astrophage.js';
 import { addLog, spend } from './util.js';
+import { effectMul } from './tech.js';
+import { drawEvent } from './events.js';
 
 export const HARVEST = {
   perDay: 14000, exp: 1.5,          // kg per day = perDay * infection^exp  (infection 0.30: 2300, Tau Ceti 0.15: 810, Sol 0.05: 160)
@@ -29,6 +31,7 @@ export function harvestPlan(state, mode = 'collector') {
   const days = cfg.days;
   let perDay = harvestRate(star) * (skim ? cfg.mult : 1);
   if (state.ship.upgrades.includes('scoop')) perDay *= 1.6;   // Rocky's scoop gathers more per day
+  perDay *= effectMul(state, 'harvestMul');
   const space = Math.max(0, state.ship.fuelMaxKg - (state.ship.fuelKg - cfg.fuelKg));
   const kg = Math.round(Math.min(perDay * days, space));
   const hullCost = skim ? +(cfg.hullBase + cfg.hullPerInf * star.infection).toFixed(3) : 0;
@@ -53,6 +56,8 @@ export function harvest(state, mode = 'collector') {
   const before = state.ship.fuelKg;
   state.ship.fuelKg = Math.min(state.ship.fuelMaxKg, state.ship.fuelKg + plan.kg);
   const gained = Math.round(state.ship.fuelKg - before);
+  state.research = (state.research ?? 0) + 2;
+  if ((state.campaign?.act ?? 1) >= 2 && !state.events?.pending) drawEvent(state, 'random', { chance: 0.15 });
   if (plan.hullCost) state.ship.hull = Math.max(0.05, state.ship.hull - plan.hullCost);
   const text = mode === 'skim'
     ? `Skimmed the Petrova line at ${star.name}: +${gained} kg Astrophage in ${plan.days} days, hull -${Math.round(plan.hullCost * 100)}%.`
